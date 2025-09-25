@@ -33,13 +33,14 @@ Papel: 88mm
     console.log(`📄 Archivo creado: ${archivo}`);
     
     try {
-        // Imprimir con notepad
-        execSync(`notepad /p ${archivo}`, { shell: true });
-        console.log('✅ ¡Enviado a imprimir!');
+        // Imprimir especificando la impresora exacta
+        execSync(`print /D:"${PRINTER_NAME}" ${archivo}`, { shell: true });
+        console.log(`✅ ¡Enviado a ${PRINTER_NAME}!`);
         
     } catch (error) {
         console.error('❌ Error:', error.message);
         console.log('💡 Verifica que la impresora esté encendida');
+        console.log(`💡 Nombre de impresora: ${PRINTER_NAME}`);
     }
 }
 
