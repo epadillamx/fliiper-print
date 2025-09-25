@@ -6,412 +6,340 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-
-// Middleware para JSON
 app.use(express.json());
 
-// Configuración específica para EPSON TM-T20III USB
+// Configuración basada en el patrón TSC exitoso, adaptado para EPSON USB
 const EPSON_CONFIG = {
-  vendorId: '0x04b8',  // Epson
-  productId: '0x0202', // TM-T20III
-  deviceName: 'EPSON TM-T20III',
-  usbPath: '\\\\.\\USBPRINT001', // Path típico para impresoras USB
-  paperWidth: {
-    PAPER_58MM: 58,
-    PAPER_80MM: 80
-  },
+  // Configuración para impresora USB instalada
+  NOMBRE_IMPRESORA: 'EPSON TM-T20III Receipt', // Nombre de la impresora instalada
+  
   // Configuración de la tienda
   SHOPID: "TU EMPRESA",
-  ADDRESS: "Dirección de tu negocio",
-  TEL: "Tel: 123-456-7890"
+  ADDRESS: "Dirección de tu negocio", 
+  TEL: "Tel: 123-456-7890",
+  
+  // Rutas de archivos temporales
+  TEMP_PATH: './temp_impresion/',
+  
+  // Configuración de papel
+  PAPER_WIDTH: 80, // 80mm = ~48 caracteres
 };
 
-// Comandos ESC/POS para TM-T20III
-const ESC_POS_COMMANDS = {
-  INIT: [0x1B, 0x40],                    // Inicializar impresora
-  ALIGN_LEFT: [0x1B, 0x61, 0x00],       // Alinear izquierda
-  ALIGN_CENTER: [0x1B, 0x61, 0x01],     // Alinear centro
-  ALIGN_RIGHT: [0x1B, 0x61, 0x02],      // Alinear derecha
-  BOLD_ON: [0x1B, 0x45, 0x01],          // Negrita ON
-  BOLD_OFF: [0x1B, 0x45, 0x00],         // Negrita OFF
-  DOUBLE_ON: [0x1D, 0x21, 0x11],        // Doble tamaño
-  DOUBLE_OFF: [0x1D, 0x21, 0x00],       // Tamaño normal
-  FEED_LINE: [0x0A],                     // Salto de línea
-  CUT_PAPER: [0x1D, 0x56, 0x00],        // Cortar papel
-  OPEN_DRAWER: [0x1B, 0x70, 0x00, 0x19, 0xFA] // Abrir cajón
-};
-
-//**********************************************************
-//* Clase para manejo directo de USB con EPSON TM-T20III
-//**********************************************************
-class EpsonUSBManager {
+class EpsonUSBPrintService {
   constructor() {
     this.seqNo = 1;
-    this.paperWidth = EPSON_CONFIG.paperWidth.PAPER_80MM;
-    this.commandBuffer = [];
+    this.isProcessing = false;
+    
+    // Crear directorio temporal si no existe (como en el ejemplo TSC)
+    if (!fs.existsSync(EPSON_CONFIG.TEMP_PATH)) {
+      fs.mkdirSync(EPSON_CONFIG.TEMP_PATH, { recursive: true });
+    }
   }
 
-  // Detectar impresora EPSON TM-T20III por USB
-  async detectUSBPrinter() {
+  // Función de sleep como en el ejemplo TSC
+  sleep(waitTimeInMs) {
+    return new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+  }
+
+  // Verificar si hay proceso de impresión en curso (como en el ejemplo TSC)
+  checkProcessingLock() {
+    const lockFile = path.join(EPSON_CONFIG.TEMP_PATH, 'temp_impresion');
+    return fs.existsSync(lockFile);
+  }
+
+  // Crear lock de procesamiento (como en el ejemplo TSC)
+  createProcessingLock() {
+    const lockFile = path.join(EPSON_CONFIG.TEMP_PATH, 'temp_impresion');
+    const now = new Date();
+    fs.writeFileSync(lockFile, now.toString());
+  }
+
+  // Remover lock de procesamiento (como en el ejemplo TSC)
+  removeProcessingLock() {
+    const lockFile = path.join(EPSON_CONFIG.TEMP_PATH, 'temp_impresion');
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+    }
+  }
+
+  // Buscar impresora EPSON instalada
+  async findEpsonPrinter() {
     try {
-      console.log('🔍 Detectando impresora EPSON TM-T20III por USB...');
+      const { stdout } = await execPromise('wmic printer get name,status,portname /format:csv');
+      const lines = stdout.split('\n').filter(line => line.trim() && !line.includes('Node,Name'));
       
-      // Método 1: Buscar por dispositivos USB
-      try {
-        const { stdout: usbDevices } = await execPromise('wmic path Win32_USBControllerDevice get dependent /format:csv');
-        const usbLines = usbDevices.split('\n').filter(line => line.includes('USB'));
-        
-        for (const line of usbLines) {
-          if (line.toLowerCase().includes('04b8') || line.toLowerCase().includes('epson')) {
-            console.log('✅ Dispositivo EPSON encontrado en USB');
-            return { found: true, method: 'USB_DEVICE', path: line.trim() };
+      for (const line of lines) {
+        const fields = line.split(',');
+        if (fields.length >= 2) {
+          const name = fields[1]?.trim();
+          const port = fields[2]?.trim();
+          const status = fields[3]?.trim();
+          
+          if (name && (
+            name.toLowerCase().includes('epson') ||
+            name.toLowerCase().includes('tm-t20') ||
+            name.toLowerCase().includes('receipt')
+          )) {
+            console.log(`Impresora EPSON encontrada: ${name}`);
+            return { name, port, status, found: true };
           }
         }
-      } catch (error) {
-        console.log('⚠️ Búsqueda por dispositivos USB falló');
       }
-
-      // Método 2: Buscar por puertos USB
-      try {
-        const { stdout: usbPorts } = await execPromise('wmic path Win32_SerialPort get deviceid,name /format:csv');
-        const portLines = usbPorts.split('\n').filter(line => line.trim());
-        
-        for (const line of portLines) {
-          if (line.toLowerCase().includes('usb') && line.toLowerCase().includes('com')) {
-            const comPort = line.match(/COM\d+/);
-            if (comPort) {
-              console.log(`✅ Puerto USB encontrado: ${comPort[0]}`);
-              return { found: true, method: 'USB_SERIAL', port: comPort[0] };
-            }
-          }
-        }
-      } catch (error) {
-        console.log('⚠️ Búsqueda por puertos serie falló');
-      }
-
-      // Método 3: Buscar impresoras con puerto USB
-      try {
-        const { stdout: printers } = await execPromise('wmic printer get name,portname /format:csv');
-        const printerLines = printers.split('\n').filter(line => line.trim() && !line.includes('Node,Name'));
-        
-        for (const line of printerLines) {
-          const fields = line.split(',');
-          if (fields.length >= 2) {
-            const name = fields[1]?.trim();
-            const port = fields[2]?.trim();
-            
-            if (name && port && (port.includes('USB') || name.toLowerCase().includes('epson'))) {
-              console.log(`✅ Impresora USB encontrada: ${name} en ${port}`);
-              return { found: true, method: 'USB_PRINTER', name, port };
-            }
-          }
-        }
-      } catch (error) {
-        console.log('⚠️ Búsqueda por impresoras USB falló');
-      }
-
-      return { found: false, method: 'NONE' };
+      
+      return { found: false };
     } catch (error) {
-      console.error('❌ Error detectando impresora USB:', error);
-      return { found: false, method: 'ERROR', error: error.message };
+      console.error('Error buscando impresora EPSON:', error);
+      return { found: false, error: error.message };
     }
   }
 
-  // Crear contenido ESC/POS binario
-  createESCPOSContent(orderData) {
-    const buffer = [];
-    
-    // Inicializar impresora
-    buffer.push(...ESC_POS_COMMANDS.INIT);
-    
-    // Abrir cajón (si es una venta)
-    if (orderData.type === 'cuenta') {
-      buffer.push(...ESC_POS_COMMANDS.OPEN_DRAWER);
-    }
+  // Generar contenido del ticket (similar al ejemplo TSC pero para recibos)
+  generarContenidoTicket(orderData) {
+    const width = EPSON_CONFIG.PAPER_WIDTH;
+    let contenido = '';
     
     // Header centrado
-    buffer.push(...ESC_POS_COMMANDS.ALIGN_CENTER);
-    buffer.push(...ESC_POS_COMMANDS.DOUBLE_ON);
-    
-    // Nombre de la empresa
-    const shopName = EPSON_CONFIG.SHOPID;
-    buffer.push(...this.textToBytes(shopName));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    
-    buffer.push(...ESC_POS_COMMANDS.DOUBLE_OFF);
-    
-    // Información de la empresa
-    buffer.push(...this.textToBytes(EPSON_CONFIG.ADDRESS));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...this.textToBytes(EPSON_CONFIG.TEL));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    contenido += this.centerText(EPSON_CONFIG.SHOPID) + '\n';
+    contenido += this.centerText(EPSON_CONFIG.ADDRESS) + '\n';
+    contenido += this.centerText(EPSON_CONFIG.TEL) + '\n\n';
     
     // Título del documento
-    buffer.push(...ESC_POS_COMMANDS.BOLD_ON);
-    const title = orderData.type === 'comanda' ? 'COMANDA' : 'CUENTA';
-    buffer.push(...this.textToBytes(title));
-    buffer.push(...ESC_POS_COMMANDS.BOLD_OFF);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    
-    buffer.push(...this.textToBytes('========================'));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    const titulo = orderData.type === 'comanda' ? 'COMANDA' : 'CUENTA';
+    contenido += this.centerText('='.repeat(titulo.length + 4)) + '\n';
+    contenido += this.centerText(`  ${titulo}  `) + '\n';
+    contenido += this.centerText('='.repeat(titulo.length + 4)) + '\n\n';
     
     // Información del pedido
-    buffer.push(...ESC_POS_COMMANDS.ALIGN_LEFT);
-    
     if (orderData.comanda) {
-      buffer.push(...this.textToBytes(`Comanda: ${orderData.comanda}`));
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+      contenido += `Comanda: ${orderData.comanda}\n`;
     }
-    
     if (orderData.ordenDeCompra) {
-      buffer.push(...this.textToBytes(`Orden: ${orderData.ordenDeCompra}`));
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+      contenido += `Orden: ${orderData.ordenDeCompra}\n`;
     }
     
-    // Timestamp
-    buffer.push(...this.textToBytes(`${this.getTimestamp()}`));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    // Fecha y hora
+    contenido += `Fecha: ${this.getTimestamp()}\n\n`;
     
     // Productos
-    buffer.push(...this.textToBytes('PRODUCTOS:'));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...this.textToBytes('------------------------'));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    contenido += 'PRODUCTOS:\n';
+    contenido += '-'.repeat(width) + '\n';
     
     if (orderData.productos && Array.isArray(orderData.productos)) {
       orderData.productos.forEach((item, index) => {
-        buffer.push(...this.textToBytes(`${index + 1}. ${item.producto}`));
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += `${index + 1}. ${item.producto}\n`;
         
         let quantityLine = `   Cant: ${item.cantidad || 1}`;
         if (item.precioUnitario) {
           quantityLine += ` x $${item.precioUnitario.toFixed(2)}`;
         }
-        buffer.push(...this.textToBytes(quantityLine));
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += quantityLine + '\n';
         
         if (item.total) {
-          buffer.push(...this.textToBytes(`   Total: $${item.total.toFixed(2)}`));
-          buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+          contenido += `   Total: $${item.total.toFixed(2)}\n`;
         }
-        
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += '\n';
       });
     }
     
-    buffer.push(...this.textToBytes('------------------------'));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    contenido += '-'.repeat(width) + '\n';
     
     // Totales (solo para cuentas)
     if (orderData.type === 'cuenta' && orderData.totalAPagar) {
       if (orderData.subtotal) {
-        buffer.push(...this.textToBytes(`SUBTOTAL:    $${orderData.subtotal.toFixed(2)}`));
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += this.rightAlign(`SUBTOTAL: $${orderData.subtotal.toFixed(2)}`) + '\n';
       }
       
       if (orderData.descuento && orderData.descuento.cantidad > 0) {
-        buffer.push(...this.textToBytes(`DESC.(${orderData.descuento.porcentaje}%): -$${orderData.descuento.cantidad.toFixed(2)}`));
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += this.rightAlign(`DESC.(${orderData.descuento.porcentaje}%): -$${orderData.descuento.cantidad.toFixed(2)}`) + '\n';
       }
       
       if (orderData.iva && orderData.iva.cantidad > 0) {
-        buffer.push(...this.textToBytes(`IVA(${orderData.iva.porcentaje}%):     +$${orderData.iva.cantidad.toFixed(2)}`));
-        buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+        contenido += this.rightAlign(`IVA(${orderData.iva.porcentaje}%): +$${orderData.iva.cantidad.toFixed(2)}`) + '\n';
       }
       
-      buffer.push(...this.textToBytes('========================'));
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-      
-      buffer.push(...ESC_POS_COMMANDS.BOLD_ON);
-      buffer.push(...this.textToBytes(`TOTAL:       $${orderData.totalAPagar.toFixed(2)}`));
-      buffer.push(...ESC_POS_COMMANDS.BOLD_OFF);
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-      
-      buffer.push(...this.textToBytes('========================'));
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-      buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+      contenido += '='.repeat(width) + '\n';
+      contenido += this.rightAlign(`TOTAL: $${orderData.totalAPagar.toFixed(2)}`) + '\n';
+      contenido += '='.repeat(width) + '\n\n';
     }
     
     // Footer
-    buffer.push(...ESC_POS_COMMANDS.ALIGN_CENTER);
-    const thankYou = orderData.type === 'comanda' ? '¡Gracias!' : '¡Gracias por su compra!';
-    buffer.push(...this.textToBytes(thankYou));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    const gracias = orderData.type === 'comanda' ? '¡Gracias!' : '¡Gracias por su compra!';
+    contenido += this.centerText(gracias) + '\n';
     
     // Número de ticket
-    const strSeqNo = ('0000' + this.seqNo).slice(-4);
-    buffer.push(...this.textToBytes(`Ticket: ${strSeqNo}`));
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
-    buffer.push(...ESC_POS_COMMANDS.FEED_LINE);
+    const ticketNo = ('0000' + this.seqNo).slice(-4);
+    contenido += this.centerText(`Ticket: ${ticketNo}`) + '\n\n\n\n';
     
-    // Cortar papel
-    buffer.push(...ESC_POS_COMMANDS.CUT_PAPER);
-    
-    return new Uint8Array(buffer);
+    return contenido;
   }
 
-  // Convertir texto a bytes
-  textToBytes(text) {
-    const bytes = [];
-    for (let i = 0; i < text.length; i++) {
-      bytes.push(text.charCodeAt(i));
+  // Funciones de formato de texto
+  centerText(text) {
+    const width = EPSON_CONFIG.PAPER_WIDTH;
+    const padding = Math.max(0, Math.floor((width - text.length) / 2));
+    return ' '.repeat(padding) + text;
+  }
+
+  rightAlign(text) {
+    const width = EPSON_CONFIG.PAPER_WIDTH;
+    const padding = Math.max(0, width - text.length);
+    return ' '.repeat(padding) + text;
+  }
+
+  // Generar timestamp (como en el ejemplo TSC)
+  getTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const hour = now.getHours().toString().padStart(2, '0');
+    const minute = now.getMinutes().toString().padStart(2, '0');
+    
+    return `${year}/${month}/${day} ${hour}:${minute}`;
+  }
+
+  // Función principal de impresión (basada en el patrón del ejemplo TSC)
+  async imprimir(orderData) {
+    console.log("PETICION EPSON USB v2024");
+    
+    // Verificar si hay proceso en curso (como en el ejemplo TSC)
+    if (this.checkProcessingLock()) {
+      return {
+        success: false,
+        message: "Hay proceso de impresión en curso",
+        color: "#ef5350",
+        orderData: orderData
+      };
     }
-    return bytes;
-  }
 
-  // Enviar datos binarios a la impresora
-  async printBinaryData(data, printerInfo) {
+    let mensajeimpresora = "";
+    let color = "";
+
     try {
-      console.log(`🖨️ Enviando datos binarios (${data.length} bytes)...`);
+      // Crear lock de procesamiento (como en el ejemplo TSC)
+      this.createProcessingLock();
+      console.log("Lock de impresión creado");
+
+      await this.sleep(1000);
+
+      console.log("Datos de orden:", orderData);
       
-      // Crear archivo temporal binario
-      const tempFile = path.join(__dirname, `epson_binary_${Date.now()}.bin`);
-      fs.writeFileSync(tempFile, data);
+      // Generar nombre de archivo temporal (similar al ejemplo TSC)
+      const timestamp = Date.now();
+      const nombreArchivo = `ticket_${timestamp}.txt`;
+      const rutaCompleta = path.join(EPSON_CONFIG.TEMP_PATH, nombreArchivo);
       
-      let success = false;
+      // Generar contenido del ticket
+      const contenido = this.generarContenidoTicket(orderData);
       
-      // Método 1: Copy a puerto USB directo
-      if (printerInfo.port) {
+      await this.sleep(2000);
+      
+      // Escribir archivo temporal (como en el ejemplo TSC)
+      fs.writeFileSync(rutaCompleta, contenido, 'utf8');
+      
+      await this.sleep(1000);
+      
+      console.log(`Archivo generado: ${rutaCompleta}`);
+      
+      // Buscar impresora EPSON instalada
+      const printer = await this.findEpsonPrinter();
+      
+      if (!printer.found) {
+        throw new Error('No se encontró impresora EPSON instalada');
+      }
+      
+      console.log(`Imprimiendo en: ${printer.name}`);
+      
+      // Intentar impresión con diferentes métodos (como múltiples intentos en TSC)
+      let impresionExitosa = false;
+      
+      // Método 1: Comando print de Windows
+      try {
+        const comando1 = `print /D:"${printer.name}" "${rutaCompleta}"`;
+        console.log(`Ejecutando: ${comando1}`);
+        await execPromise(comando1);
+        console.log("Método 1 exitoso");
+        impresionExitosa = true;
+      } catch (error) {
+        console.log("Método 1 falló:", error.message);
+      }
+      
+      // Método 2: Copy directo (si el método 1 falla)
+      if (!impresionExitosa) {
         try {
-          await execPromise(`copy /b "${tempFile}" "${printerInfo.port}"`);
-          console.log('✅ Enviado por puerto USB directo');
-          success = true;
+          const comando2 = `copy "${rutaCompleta}" "${printer.name}"`;
+          console.log(`Ejecutando: ${comando2}`);
+          await execPromise(comando2);
+          console.log("Método 2 exitoso");
+          impresionExitosa = true;
         } catch (error) {
-          console.log('⚠️ Envío por puerto USB falló:', error.message);
+          console.log("Método 2 falló:", error.message);
         }
       }
       
-      // Método 2: Copy a dispositivo PRN
-      if (!success) {
+      // Método 3: Type + redirection (último recurso)
+      if (!impresionExitosa) {
         try {
-          await execPromise(`copy /b "${tempFile}" PRN`);
-          console.log('✅ Enviado por dispositivo PRN');
-          success = true;
+          const comando3 = `type "${rutaCompleta}" > "${printer.name}"`;
+          console.log(`Ejecutando: ${comando3}`);
+          await execPromise(comando3);
+          console.log("Método 3 exitoso");
+          impresionExitosa = true;
         } catch (error) {
-          console.log('⚠️ Envío por PRN falló:', error.message);
+          console.log("Método 3 falló:", error.message);
         }
       }
       
-      // Método 3: Usar LPT1 (puerto paralelo/USB)
-      if (!success) {
-        try {
-          await execPromise(`copy /b "${tempFile}" LPT1`);
-          console.log('✅ Enviado por LPT1');
-          success = true;
-        } catch (error) {
-          console.log('⚠️ Envío por LPT1 falló:', error.message);
+      if (impresionExitosa) {
+        mensajeimpresora = "Se imprimió correctamente";
+        color = "#06d79c";
+        
+        // Incrementar número de secuencia (como en el ejemplo TSC)
+        this.seqNo += 1;
+        if (this.seqNo > 9999) {
+          this.seqNo = 1;
         }
+      } else {
+        throw new Error('Todos los métodos de impresión fallaron');
       }
       
-      // Método 4: Usar impresora por nombre si existe
-      if (!success && printerInfo.name) {
-        try {
-          // Crear archivo de comandos batch
-          const batchFile = path.join(__dirname, `print_${Date.now()}.bat`);
-          const batchContent = `@echo off\ncopy /b "${tempFile}" "${printerInfo.name}"`;
-          fs.writeFileSync(batchFile, batchContent);
-          
-          await execPromise(`"${batchFile}"`);
-          console.log('✅ Enviado por nombre de impresora');
-          success = true;
-          
-          // Limpiar archivo batch
-          setTimeout(() => {
-            try {
-              if (fs.existsSync(batchFile)) fs.unlinkSync(batchFile);
-            } catch (e) {}
-          }, 1000);
-        } catch (error) {
-          console.log('⚠️ Envío por nombre de impresora falló:', error.message);
-        }
-      }
+      console.log("Impresión completada");
       
-      // Limpiar archivo temporal
+      // Limpiar archivo temporal después de un tiempo
       setTimeout(() => {
         try {
-          if (fs.existsSync(tempFile)) {
-            fs.unlinkSync(tempFile);
+          if (fs.existsSync(rutaCompleta)) {
+            fs.unlinkSync(rutaCompleta);
           }
         } catch (e) {
           console.warn('No se pudo eliminar archivo temporal:', e.message);
         }
-      }, 3000);
-      
-      if (!success) {
-        throw new Error('Todos los métodos de envío binario fallaron');
-      }
-      
-      return true;
+      }, 5000);
       
     } catch (error) {
-      console.error('❌ Error enviando datos binarios:', error);
-      throw error;
+      console.error("Error en impresión:", error);
+      mensajeimpresora = error.message;
+      color = "#ef5350";
+    } finally {
+      // Remover lock (como en el ejemplo TSC)
+      this.removeProcessingLock();
+      console.log("Lock de impresión removido");
     }
-  }
 
-  // Imprimir recibo
-  async printReceipt(orderData) {
-    try {
-      console.log('🔍 Detectando impresora EPSON TM-T20III...');
-      
-      const printerInfo = await this.detectUSBPrinter();
-      
-      if (!printerInfo.found) {
-        throw new Error('No se detectó impresora EPSON TM-T20III. Verifica que esté conectada y encendida.');
-      }
-      
-      console.log(`✅ Impresora detectada: ${printerInfo.method}`);
-      
-      // Crear contenido ESC/POS binario
-      const binaryData = this.createESCPOSContent(orderData);
-      
-      // Enviar a la impresora
-      await this.printBinaryData(binaryData, printerInfo);
-      
-      // Incrementar número de secuencia
-      this.seqNo += 1;
-      if (this.seqNo > 9999) {
-        this.seqNo = 1;
-      }
-      
-      return {
-        success: true,
-        method: printerInfo.method,
-        seqNo: this.seqNo - 1,
-        dataSize: binaryData.length
-      };
-      
-    } catch (error) {
-      console.error('❌ Error en impresión:', error);
-      throw error;
-    }
-  }
-
-  // Generar timestamp
-  getTimestamp() {
-    const now = new Date();
-    
-    let year = now.getFullYear();
-    let month = (now.getMonth() + 1).toString().padStart(2, '0');
-    let day = now.getDate().toString().padStart(2, '0');
-    let hour = now.getHours().toString().padStart(2, '0');
-    let minute = now.getMinutes().toString().padStart(2, '0');
-    
-    return `${year}/${month}/${day} ${hour}:${minute}`;
+    return {
+      success: color === "#06d79c",
+      message: mensajeimpresora,
+      color: color,
+      orderData: orderData,
+      seqNo: this.seqNo - 1
+    };
   }
 }
 
-// Instancia global del manager
-const usbManager = new EpsonUSBManager();
+// Instancia global del servicio
+const printService = new EpsonUSBPrintService();
 
-//**********************************************************
-//* Endpoints del servidor
-//**********************************************************
+// Endpoints del servidor
 
 // Endpoint para imprimir comanda
 app.post('/imprimir-comanda', async (req, res) => {
@@ -426,8 +354,8 @@ app.post('/imprimir-comanda', async (req, res) => {
       });
     }
 
-    console.log(`\n🖨️ === IMPRIMIENDO COMANDA EPSON USB ===`);
-    console.log(`📝 Comanda: ${comanda}, Orden: ${ordenDeCompra}`);
+    console.log(`\n=== IMPRIMIENDO COMANDA EPSON USB ===`);
+    console.log(`Comanda: ${comanda}, Orden: ${ordenDeCompra}`);
 
     // Preparar datos para impresión
     const orderData = {
@@ -435,38 +363,35 @@ app.post('/imprimir-comanda', async (req, res) => {
       type: 'comanda'
     };
 
-    // Imprimir usando USB directo
-    const result = await usbManager.printReceipt(orderData);
+    // Imprimir usando el servicio
+    const result = await printService.imprimir(orderData);
 
-    const respuesta = {
-      success: true,
-      message: 'Comanda impresa correctamente en EPSON TM-T20III (USB)',
-      metodo: result.method,
-      modelo: 'TM-T20III',
-      conexion: 'USB Directo',
-      comanda: comanda,
-      orden: ordenDeCompra,
-      seqNo: result.seqNo,
-      dataSize: result.dataSize,
-      timestamp: new Date().toISOString()
-    };
-
-    console.log('✅ === COMANDA IMPRESA EXITOSAMENTE ===\n');
-    res.json(respuesta);
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        metodo: 'USB Windows Print',
+        modelo: 'EPSON TM-T20III',
+        comanda: comanda,
+        orden: ordenDeCompra,
+        seqNo: result.seqNo,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.message,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    }
 
   } catch (error) {
-    console.error('❌ Error en impresión de comanda:', error);
-    
+    console.error('Error en endpoint de comanda:', error);
     res.status(500).json({ 
-      error: 'Error al imprimir comanda', 
+      error: 'Error interno del servidor', 
       details: error.message,
-      sugerencias: [
-        'Verificar que la EPSON TM-T20III esté encendida y conectada por USB',
-        'Instalar drivers oficiales de Epson desde epson.com',
-        'Verificar que Windows reconozca el dispositivo USB',
-        'Ejecutar el servidor como administrador',
-        'Revisar que no haya otras aplicaciones usando la impresora'
-      ],
       timestamp: new Date().toISOString()
     });
   }
@@ -485,8 +410,8 @@ app.post('/imprimir-cuenta', async (req, res) => {
       });
     }
 
-    console.log(`\n🧾 === IMPRIMIENDO CUENTA EPSON USB ===`);
-    console.log(`📝 Orden: ${ordenDeCompra}, Total: $${totalAPagar}`);
+    console.log(`\n=== IMPRIMIENDO CUENTA EPSON USB ===`);
+    console.log(`Orden: ${ordenDeCompra}, Total: $${totalAPagar}`);
 
     // Preparar datos para impresión
     const orderData = {
@@ -494,30 +419,34 @@ app.post('/imprimir-cuenta', async (req, res) => {
       type: 'cuenta'
     };
 
-    // Imprimir usando USB directo
-    const result = await usbManager.printReceipt(orderData);
+    // Imprimir usando el servicio
+    const result = await printService.imprimir(orderData);
 
-    const respuesta = {
-      success: true,
-      message: 'Cuenta impresa correctamente en EPSON TM-T20III (USB)',
-      metodo: result.method,
-      modelo: 'TM-T20III',
-      conexion: 'USB Directo',
-      orden: ordenDeCompra,
-      total: totalAPagar,
-      seqNo: result.seqNo,
-      dataSize: result.dataSize,
-      timestamp: new Date().toISOString()
-    };
-
-    console.log('✅ === CUENTA IMPRESA EXITOSAMENTE ===\n');
-    res.json(respuesta);
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        metodo: 'USB Windows Print',
+        modelo: 'EPSON TM-T20III',
+        orden: ordenDeCompra,
+        total: totalAPagar,
+        seqNo: result.seqNo,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.message,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    }
 
   } catch (error) {
-    console.error('❌ Error en impresión de cuenta:', error);
-    
+    console.error('Error en endpoint de cuenta:', error);
     res.status(500).json({ 
-      error: 'Error al imprimir cuenta', 
+      error: 'Error interno del servidor', 
       details: error.message,
       timestamp: new Date().toISOString()
     });
@@ -527,14 +456,12 @@ app.post('/imprimir-cuenta', async (req, res) => {
 // Endpoint para detectar impresora
 app.get('/detectar-impresora', async (req, res) => {
   try {
-    console.log('🔍 Detectando impresora EPSON TM-T20III...');
-    
-    const printerInfo = await usbManager.detectUSBPrinter();
+    const printer = await printService.findEpsonPrinter();
     
     res.json({
-      success: printerInfo.found,
-      message: printerInfo.found ? 'Impresora EPSON TM-T20III detectada' : 'Impresora no detectada',
-      deteccion: printerInfo,
+      success: printer.found,
+      message: printer.found ? 'Impresora EPSON encontrada' : 'Impresora EPSON no encontrada',
+      printer: printer,
       configuracion: EPSON_CONFIG,
       timestamp: new Date().toISOString()
     });
@@ -551,9 +478,8 @@ app.get('/detectar-impresora', async (req, res) => {
 // Endpoint de prueba
 app.post('/test-printer', async (req, res) => {
   try {
-    console.log(`🧪 === PRUEBA DE IMPRESORA EPSON USB ===`);
+    console.log(`=== PRUEBA DE IMPRESORA EPSON USB ===`);
 
-    // Datos de prueba
     const testData = {
       type: 'comanda',
       comanda: 'TEST-001',
@@ -566,27 +492,31 @@ app.post('/test-printer', async (req, res) => {
       ]
     };
 
-    const result = await usbManager.printReceipt(testData);
+    const result = await printService.imprimir(testData);
     
-    const resultado = {
-      success: true,
-      message: 'Prueba de impresión USB exitosa en EPSON TM-T20III',
-      metodo: result.method,
-      modelo: 'TM-T20III',
-      conexion: 'USB Directo',
-      seqNo: result.seqNo,
-      dataSize: result.dataSize,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log('✅ === PRUEBA USB EXITOSA ===\n');
-    res.json(resultado);
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        metodo: 'USB Windows Print',
+        modelo: 'EPSON TM-T20III',
+        seqNo: result.seqNo,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.message,
+        color: result.color,
+        timestamp: new Date().toISOString()
+      });
+    }
     
   } catch (error) {
-    console.error('❌ Prueba USB falló:', error.message);
-    
+    console.error('Error en prueba:', error);
     res.status(500).json({ 
-      error: 'Prueba de impresora USB falló', 
+      error: 'Error en prueba de impresora', 
       details: error.message,
       timestamp: new Date().toISOString()
     });
@@ -597,18 +527,9 @@ app.post('/test-printer', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK',
-    servicio: 'Servidor EPSON TM-T20III USB Directo',
-    version: '4.0.0',
-    metodo: 'USB Binary ESC/POS',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Manejo de errores global
-app.use((error, req, res, next) => {
-  console.error('❌ Error no manejado:', error);
-  res.status(500).json({ 
-    error: 'Error interno del servidor',
+    servicio: 'Servidor EPSON TM-T20III USB',
+    version: '5.0.0',
+    metodo: 'Windows Print System',
     timestamp: new Date().toISOString()
   });
 });
@@ -616,20 +537,18 @@ app.use((error, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 === SERVIDOR EPSON TM-T20III USB DIRECTO ===`);
-  console.log(`📡 Puerto: ${PORT}`);
-  console.log(`🖨️ Modelo: TM-T20III`);
-  console.log(`🔌 Conexión: USB Directo (ESC/POS Binario)`);
-  console.log(`🆔 Vendor ID: ${EPSON_CONFIG.vendorId}`);
-  console.log(`🆔 Product ID: ${EPSON_CONFIG.productId}`);
-  console.log('\n📋 Endpoints disponibles:');
+  console.log(`\n=== SERVIDOR EPSON TM-T20III USB ===`);
+  console.log(`Puerto: ${PORT}`);
+  console.log(`Modelo: EPSON TM-T20III`);
+  console.log(`Conexión: USB (Sistema Windows)`);
+  console.log(`Patrón: Basado en TSC exitoso`);
+  console.log('\nEndpoints:');
   console.log(`  POST http://localhost:${PORT}/imprimir-comanda`);
   console.log(`  POST http://localhost:${PORT}/imprimir-cuenta`);
   console.log(`  GET  http://localhost:${PORT}/detectar-impresora`);
   console.log(`  POST http://localhost:${PORT}/test-printer`);
   console.log(`  GET  http://localhost:${PORT}/health`);
-  console.log('\n⚠️  IMPORTANTE: Ejecutar como administrador para acceso USB');
-  console.log('✅ Servidor listo para impresión USB directa\n');
+  console.log('\nServidor listo para impresión USB');
 });
 
 module.exports = app;
