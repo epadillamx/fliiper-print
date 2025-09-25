@@ -3,8 +3,14 @@
 
 Imprimi comandas y cuentas
 
+```Bash
+npm install printer
+rm -r node_modules
+```
+
 ## Instalar PM2 globalmente
 ```Bash
+
 npm install -g pm2
 ```
 ## Instalar PM2 globalmente
