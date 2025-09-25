@@ -476,7 +476,7 @@ app.get('/detectar-impresora', async (req, res) => {
 });
 
 // Endpoint de prueba
-app.post('/test-printer', async (req, res) => {
+app.get('/test-printer', async (req, res) => {
   try {
     console.log(`=== PRUEBA DE IMPRESORA EPSON USB ===`);
 
