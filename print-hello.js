@@ -1,117 +1,132 @@
-// print-hello.js - Script simple con notepad /p para Epson TM-T20III
-const { execSync } = require('child_process');
-const fs = require('fs');
+// epos-print.js - Script simple con Epson ePOS SDK for JavaScript
+// Datos de tu impresora: EPSON TM-T20III Receipt, Puerto: TMUSB001
 
-// Configuración
-const PRINTER_NAME = "EPSON TM-T20III Receipt";
+const epos = require('epos');
 
-function imprimir() {
-    console.log('🖨️  Imprimiendo HOLA MUNDO con notepad /p...\n');
-    
-    // Crear contenido simple para 88mm con centrado perfecto
-    const ancho = 42; // Ancho real disponible para texto (sin márgenes)
-    
-    // Función para centrar texto perfectamente
-    function centrar(texto) {
-        if (texto.length >= ancho) return texto.substring(0, ancho);
-        const espacios = Math.floor((ancho - texto.length) / 2);
-        return ' '.repeat(espacios) + texto;
-    }
-    
-    const separador = '='.repeat(ancho);
-    const separadorCorto = '-'.repeat(ancho);
-    
-    const contenido = `${separador}
-${centrar('HOLA MUNDO')}
-${centrar('Desde Node.js 22')}
-${separador}
+// Configuración de tu impresora TM-T20III
+const PRINTER_CONFIG = {
+    type: epos.DEVICE_TYPE_PRINTER,
+    deviceName: 'EPSON TM-T20III Receipt',
+    port: 'TMUSB001',
+    model: 'TM-T20III'
+};
 
-Fecha: ${new Date().toLocaleString()}
-
-Impresora: EPSON TM-T20III Receipt
-Papel: 88mm
-
-${separadorCorto}
-${centrar('¡Funciona perfectamente!')}
-${separadorCorto}
-
-
-`;
-    
-    // Guardar archivo
-    const archivo = 'ticket.txt';
-    fs.writeFileSync(archivo, contenido, 'utf8');
-    
-    console.log(`📄 Archivo creado: ${archivo}`);
-    console.log(`🎯 Configurando impresora: ${PRINTER_NAME}`);
-    
-    let impresoraPredeterminadaOriginal = null;
+function imprimirHolaMundo() {
+    console.log('🖨️  Imprimiendo HOLA MUNDO con ePOS SDK...\n');
+    console.log('📋 Configuración:');
+    console.log(`   Modelo: ${PRINTER_CONFIG.model}`);
+    console.log(`   Nombre: ${PRINTER_CONFIG.deviceName}`);
+    console.log(`   Puerto: ${PRINTER_CONFIG.port}\n`);
     
     try {
-        // 1. Obtener impresora predeterminada actual
-        console.log('🔍 Obteniendo impresora predeterminada actual...');
-        try {
-            const resultado = execSync('wmic printer where default=true get name /format:csv', { 
-                encoding: 'utf8', 
-                shell: true 
-            });
-            const lineas = resultado.split('\n').filter(linea => linea.includes(','));
-            if (lineas.length > 0) {
-                impresoraPredeterminadaOriginal = lineas[0].split(',')[1];
-                console.log(`📌 Predeterminada actual: ${impresoraPredeterminadaOriginal}`);
-            }
-        } catch (error) {
-            console.log('⚠️  No se pudo obtener impresora predeterminada original');
-        }
+        // Crear objeto ePOS-Print
+        const printer = new epos.ePOSPrint();
         
-        // 2. Establecer Epson como predeterminada
-        console.log('🔄 Configurando Epson como predeterminada...');
-        execSync(`wmic printer where name="${PRINTER_NAME}" call SetDefaultPrinter`, { 
-            shell: true 
-        });
-        console.log('✅ Epson configurada como predeterminada');
+        // Inicializar impresora
+        printer.addTextAlign(printer.ALIGN_CENTER);
+        printer.addTextSize(2, 2); // Texto doble tamaño
+        printer.addTextStyle(false, false, true, epos.COLOR_1); // Negrita
         
-        // 3. Imprimir con notepad /p
-        console.log('🖨️  Enviando a notepad /p...');
-        execSync(`notepad /p ${archivo}`, { 
-            shell: true,
-            stdio: 'ignore'
-        });
-        console.log('✅ ¡Enviado a imprimir con notepad /p!');
+        // Título principal
+        printer.addText('HOLA MUNDO\n');
         
-        // 4. Restaurar impresora predeterminada original
-        if (impresoraPredeterminadaOriginal) {
-            console.log('🔄 Restaurando impresora predeterminada original...');
-            try {
-                execSync(`wmic printer where name="${impresoraPredeterminadaOriginal}" call SetDefaultPrinter`, { 
-                    shell: true 
+        // Resetear formato
+        printer.addTextSize(1, 1);
+        printer.addTextStyle(false, false, false, epos.COLOR_1);
+        
+        // Subtítulo
+        printer.addText('Epson ePOS SDK for JavaScript\n');
+        printer.addText('================================\n\n');
+        
+        // Información del ticket (alineado a la izquierda)
+        printer.addTextAlign(printer.ALIGN_LEFT);
+        printer.addText(`Fecha: ${new Date().toLocaleString()}\n`);
+        printer.addText(`Modelo: ${PRINTER_CONFIG.model}\n`);
+        printer.addText(`Puerto: ${PRINTER_CONFIG.port}\n`);
+        printer.addText('Papel: 88mm\n');
+        printer.addText('SDK: Epson ePOS SDK\n\n');
+        
+        // Mensaje final centrado
+        printer.addTextAlign(printer.ALIGN_CENTER);
+        printer.addText('--------------------------------\n');
+        printer.addText('¡Impresión exitosa!\n');
+        printer.addText('--------------------------------\n\n');
+        
+        // Cortar papel
+        printer.addCut(printer.CUT_FEED);
+        
+        // Configurar conexión
+        const device = new epos.Device();
+        
+        console.log('🔌 Conectando a la impresora...');
+        
+        // Conectar al dispositivo
+        device.connect(PRINTER_CONFIG.deviceName, PRINTER_CONFIG.type, {
+            crypto: false,
+            buffer: false
+        }, (data, code) => {
+            if (code === 'OK') {
+                console.log('✅ Conectado correctamente');
+                console.log('📄 Enviando documento...');
+                
+                // Enviar datos de impresión
+                device.send(printer.toString(), (response, errorCode) => {
+                    if (errorCode === 'OK') {
+                        console.log('✅ ¡HOLA MUNDO impreso correctamente!');
+                        console.log('📋 Revisa tu Epson TM-T20III');
+                    } else {
+                        console.error('❌ Error al imprimir:', errorCode);
+                        console.log('💡 Verifica que la impresora tenga papel');
+                    }
+                    
+                    // Desconectar
+                    device.disconnect(() => {
+                        console.log('🔌 Desconectado de la impresora');
+                    });
                 });
-                console.log(`✅ Restaurada: ${impresoraPredeterminadaOriginal}`);
-            } catch (error) {
-                console.log('⚠️  No se pudo restaurar impresora predeterminada original');
+                
+            } else {
+                console.error('❌ Error de conexión:', code);
+                console.log('\n💡 Soluciones:');
+                console.log('   1. Verifica que la impresora esté encendida');
+                console.log('   2. Ejecuta como administrador');
+                console.log('   3. Instala: npm install epos');
+                console.log('   4. Verifica el nombre exacto de la impresora');
             }
-        }
+        });
         
     } catch (error) {
-        console.error('❌ Error:', error.message);
-        console.log('💡 Soluciones:');
-        console.log('   1. Ejecuta como ADMINISTRADOR');
-        console.log('   2. Verifica que la impresora esté encendida');
-        console.log(`   3. Verifica el nombre: "${PRINTER_NAME}"`);
-        
-        // Intentar restaurar predeterminada en caso de error
-        if (impresoraPredeterminadaOriginal) {
-            try {
-                execSync(`wmic printer where name="${impresoraPredeterminadaOriginal}" call SetDefaultPrinter`, { 
-                    shell: true 
-                });
-                console.log(`✅ Impresora predeterminada restaurada: ${impresoraPredeterminadaOriginal}`);
-            } catch (restoreError) {
-                console.log('⚠️  No se pudo restaurar impresora predeterminada');
-            }
-        }
+        console.error('❌ Error general:', error.message);
+        console.log('\n📦 Instalación requerida:');
+        console.log('   npm install epos');
+        console.log('\n🔧 Requisitos:');
+        console.log('   - Epson TM-T20III driver instalado');
+        console.log('   - Node.js 22');
+        console.log('   - Windows con permisos de administrador');
+    }
+}
+
+// Función para verificar SDK
+function verificarSDK() {
+    try {
+        require('epos');
+        console.log('✅ Epson ePOS SDK encontrado');
+        return true;
+    } catch (error) {
+        console.log('❌ Epson ePOS SDK no encontrado');
+        console.log('📦 Instala con: npm install epos');
+        return false;
     }
 }
 
 // Ejecutar
-imprimir();
+console.log('🚀 EPSON ePOS SDK - HOLA MUNDO');
+console.log('=' .repeat(40));
+
+if (verificarSDK()) {
+    console.log('');
+    imprimirHolaMundo();
+} else {
+    console.log('\n💡 Primero instala el SDK:');
+    console.log('   npm install epos');
+}

@@ -4,9 +4,21 @@
 Imprimi comandas y cuentas
 
 ```Bash
-node list-printers.js
+npm cache clean --force
 
-node print-hello.js
+# 2. VERIFICAR CACHE LIMPIO
+npm cache verify
+
+# 3. ELIMINAR node_modules DEL PROYECTO
+rmdir /s /q node_modules
+
+# 4. ELIMINAR package-lock.json
+del package-lock.json
+
+# 5. LIMPIAR CACHE GLOBAL DE NPM
+npm cache clean --force
+
+npm install epos
 
 ```
 
