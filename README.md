@@ -23,6 +23,11 @@ npm install escpos escpos-usb
 
 ```
 
+```Bash
+npm start
+
+```
+
 ## Instalar PM2 globalmente
 ```Bash
 

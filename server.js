@@ -124,5 +124,5 @@ app.post("/print/raw", async (req, res) => {
 // Servidor
 const PORT = 3000;
 app.listen(PORT, () =>
-  console.log(`Servidor de impresión corriendo en http://localhost:${PORT}`)
+  console.log(`API http://localhost:${PORT}`)
 );
