@@ -8,20 +8,32 @@ const PRINTER_NAME = "EPSON TM-T20III Receipt";
 function imprimir() {
     console.log('🖨️  Imprimiendo HOLA MUNDO...\n');
     
-    // Crear contenido simple para 88mm (48 caracteres)
-    const contenido = `================================================
-                  HOLA MUNDO                   
-              Desde Node.js 22               
-================================================
+    // Crear contenido simple para 88mm con centrado perfecto
+    const ancho = 42; // Ancho real disponible para texto (sin márgenes)
+    
+    // Función para centrar texto perfectamente
+    function centrar(texto) {
+        if (texto.length >= ancho) return texto.substring(0, ancho);
+        const espacios = Math.floor((ancho - texto.length) / 2);
+        return ' '.repeat(espacios) + texto;
+    }
+    
+    const separador = '='.repeat(ancho);
+    const separadorCorto = '-'.repeat(ancho);
+    
+    const contenido = `${separador}
+${centrar('HOLA MUNDO')}
+${centrar('Desde Node.js 22')}
+${separador}
 
 Fecha: ${new Date().toLocaleString()}
 
 Impresora: EPSON TM-T20III Receipt
 Papel: 88mm
 
-================================
-      ¡Funciona perfectamente!      
-================================
+${separadorCorto}
+${centrar('¡Funciona perfectamente!')}
+${separadorCorto}
 
 
 `;
