@@ -1,8 +1,17 @@
 {
-  "name": "epson-printer-script",
+  "name": "print-server-windows",
   "version": "1.0.0",
-  "description": "Script para imprimir en impresora EPSON TM-T20III",
-  "main": "imprimir.js",
-  "author": "Tu nombre",
-  "license": "MIT"
+  "main": "server.js",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
+    "express": "^4.19.2",
+    "pdf-to-printer": "^5.0.1",
+    "puppeteer": "^24.10.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
 }
