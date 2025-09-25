@@ -6,6 +6,8 @@ Imprimi comandas y cuentas
 ```Bash
 node list-printers.js
 
+node print-hello.js
+
 ```
 
 ## Instalar PM2 globalmente
