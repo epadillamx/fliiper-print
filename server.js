@@ -29,6 +29,9 @@ app.get("/printers", async (req, res) => {
 
 // POST /print -> PDF
 app.post("/print", async (req, res) => {
+
+
+
   const { html, printerName } = req.body;
   if (!html) return res.status(400).json({ error: "Falta parámetro 'html'" });
 
@@ -36,8 +39,8 @@ app.post("/print", async (req, res) => {
   try {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-   // await page.setContent(html);
-   await page.setContent(`
+    // await page.setContent(html);
+    await page.setContent(`
       <style>
         body {
           font-family: Arial;
@@ -52,20 +55,19 @@ app.post("/print", async (req, res) => {
     `);
 
     await page.pdf({
-  path: pdfPath,
-  printBackground: true,
-  width: '3.15in',   // 80 mm
-  height: '11.69in', // 297 mm
-  margin: { top: 0, bottom: 0, left: 0, right: 0 }
-});
+      path: pdfPath,
+      printBackground: true,
+      width: '3.15in',   // 80 mm
+      height: '11.69in', // 297 mm
+      margin: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
 
-
-  //  await page.pdf({ path: pdfPath, format: "A6", printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } });
-  //  await page.pdf({ path: pdfPath, format: "A6", printBackground: true });
     await browser.close();
 
-    await printer.print(pdfPath, printerName ? { printer: printerName } : {});
-    fs.unlinkSync(pdfPath);
+    if(process.development==='production')
+
+      await printer.print(pdfPath, printerName ? { printer: printerName } : {});
+      fs.unlinkSync(pdfPath);
 
     res.json({ success: true, message: "Ticket enviado a imprimir (PDF)" });
   } catch (err) {

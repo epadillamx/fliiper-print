@@ -3,7 +3,8 @@ module.exports = {
     name: 'app',
     script: './server.js',
     env: {
-      NODE_ENV: 'development'
+      NODE_ENV: 'development',
+      PORT: 3000
     },
     env_production: {
       NODE_ENV: 'production',
