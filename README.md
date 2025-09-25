@@ -4,8 +4,8 @@
 Imprimi comandas y cuentas
 
 ```Bash
-npm install printer
-rm -r node_modules
+node list-printers.js
+
 ```
 
 ## Instalar PM2 globalmente
