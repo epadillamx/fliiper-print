@@ -1,19 +1,24 @@
 {
-  "name": "fliiper-print",
+  "name": "epson-printer-script",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Script para imprimir en impresora EPSON TM-T20III",
+  "main": "imprimir.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node imprimir.js",
+    "test": "node -e \"require('./imprimir.js').detectarPuertos()\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "serialport": "^12.0.0",
     "escpos": "^3.0.0-alpha.6",
-    "escpos-network": "^3.0.0-alpha.5",
-    "escpos-usb": "^3.0.0-alpha.4",
-    "express": "^5.1.0"
-  }
+    "escpos-usb": "^2.0.0",
+    "escpos-serialport": "^2.0.0"
+  },
+  "keywords": [
+    "printer",
+    "epson",
+    "pos",
+    "thermal"
+  ],
+  "author": "Tu nombre",
+  "license": "MIT"
 }
