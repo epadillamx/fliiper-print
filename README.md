@@ -60,6 +60,15 @@ curl -X POST http://localhost:3000/print \
   "printerName": "EPSON TM-T20III Receipt"
 }'
 
+
+
+curl -X POST http://localhost:3000/print \
+-H "Content-Type: application/json; charset=utf-8" \
+-d '{
+  "html": "<style>.center { text-align: center; } .bold { font-weight: bold; } .small { font-size: 10px; } .line { border-bottom: 1px dashed #999; margin: 10px 0; } .right { text-align: right; } .flex-row { display: flex; justify-content: space-between; margin: 2px 0; } .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; } .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }</style><div class=\"center bold\">BUSINESS NAME</div><div class=\"center small\">123 Main Street<br>Suite 567<br>City Name, State 54321<br>123-456-7890</div><div class=\"line\"></div><div class=\"flex-row small\"><span>Lorem ipsum</span><span>$1.25</span></div><div class=\"flex-row small\"><span>Dolor sit amet</span><span>$7.99</span></div><div class=\"flex-row small\"><span>Consectetur</span><span>$26.70</span></div><div class=\"flex-row small\"><span>Adipiscing elit</span><span>$15.49</span></div><div class=\"flex-row small\"><span>Sed semper</span><span>$18.79</span></div><div class=\"flex-row small\"><span>Accumsan ante</span><span>$42.99</span></div><div class=\"flex-row small\"><span>Non laoreet</span><span>$9.99</span></div><div class=\"flex-row small\"><span>Pul dapibus eu</span><span>$27.50</span></div><div class=\"line\"></div><div class=\"total-section\"><div class=\"flex-row small\"><span>Sub Total</span><span>$150.70</span></div><div class=\"flex-row small\"><span>Sales Tax</span><span>$5.29</span></div><div class=\"line\"></div><div class=\"flex-row final-total\"><span>TOTAL</span><span>$155.99</span></div></div><div class=\"line\"></div><div class=\"center small\">Paid By: Credit</div><div class=\"center small\" style=\"margin-top: 15px;\">Credit Card: ****1234<br>Transaction ID: 234-567890<br>Approval Code: 123456</div><div class=\"line\"></div><div class=\"center small\">Thank You For Supporting<br>Local Business!</div>",
+  "printerName": "EPSON TM-T20III Receipt"
+}'
+
 ```
 
 ```Bash
