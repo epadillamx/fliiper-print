@@ -22,6 +22,8 @@ Imprimi comandas y cuentas
 npm install escpos escpos-usb
 npm install cors
 
+ms-windows-store://pdp/?ProductId=9mvs1j51gmk6
+
 ```
 ```Bash
 pm2 save
