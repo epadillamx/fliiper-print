@@ -23,6 +23,14 @@ npm install escpos escpos-usb
 npm install cors
 
 ```
+```Bash
+pm2 save
+pm2-windows-startup install
+
+pm2 status
+pm2 logs ngrok-tunnel
+
+```
 
 ```Bash
 npm start
@@ -54,7 +62,7 @@ pm2 save
 
 ```Bash
 
-curl -X POST http://localhost:3000/print-comanda \
+curl -X POST https://585a1cf81130.ngrok-free.app/print-comanda \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "numeroComanda": "4908",
