@@ -53,22 +53,88 @@ pm2 save
 
 ```Bash
 
-curl -X POST http://localhost:3000/print \
--H "Content-Type: application/json" \
--d '{
-  "html": "<style>.center { text-align: center; } .bold { font-weight: bold; } .small { font-size: 12px; } .line { border-bottom: 1px dashed #999; margin: 10px 0; }</style><div class=\"center bold\">COMANDA #4908</div><div class=\"line\"></div><div class=\"small\"><div>Cuenta: 4530 - Orden 1</div><div>Mesa: MESA (4)</div><div>Mesero: PROMWEBSOFT</div><div>Fecha y hora del pedido: 2021-12-10 11:06:35</div></div><div class=\"line\"></div><table width=\"100%\" class=\"small\"><tr class=\"bold\"><td>CANTIDAD</td><td>PRODUCTO</td></tr><tr><td>-> 1.0</td><td>BURRITO</td></tr><tr><td>-> 1.0</td><td>COCá COLA SIN AZUCRA 600ML</td></tr><tr><td>-> 1.0</td><td>AREPA SOLO HUEVO</td></tr><tr><td>-> 1.0</td><td>FRUTO PERA PEQUEÑO</td></tr></table><div class=\"line\"></div><div class=\"center small\">Impresa por primera vez<br>2021-12-10 11:15:11</div>",
-  "printerName": "EPSON TM-T20III Receipt"
-}'
-
-
-
-curl -X POST http://localhost:3000/print \
+curl -X POST http://localhost:3000/printcomanda \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
-  "html": "<style>.center { text-align: center; } .bold { font-weight: bold; } .small { font-size: 10px; } .line { border-bottom: 1px dashed #999; margin: 10px 0; } .right { text-align: right; } .flex-row { display: flex; justify-content: space-between; margin: 2px 0; } .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; } .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }</style><div class=\"center bold\">BUSINESS NAME</div><div class=\"center small\">123 Main Street<br>Suite 567<br>City Name, State 54321<br>123-456-7890</div><div class=\"line\"></div><div class=\"flex-row small\"><span>Lorem ipsum</span><span>$1.25</span></div><div class=\"flex-row small\"><span>Dolor sit amet</span><span>$7.99</span></div><div class=\"flex-row small\"><span>Consectetur</span><span>$26.70</span></div><div class=\"flex-row small\"><span>Adipiscing elit</span><span>$15.49</span></div><div class=\"flex-row small\"><span>Sed semper</span><span>$18.79</span></div><div class=\"flex-row small\"><span>Accumsan ante</span><span>$42.99</span></div><div class=\"flex-row small\"><span>Non laoreet</span><span>$9.99</span></div><div class=\"flex-row small\"><span>Pul dapibus eu</span><span>$27.50</span></div><div class=\"line\"></div><div class=\"total-section\"><div class=\"flex-row small\"><span>Sub Total</span><span>$150.70</span></div><div class=\"flex-row small\"><span>Sales Tax</span><span>$5.29</span></div><div class=\"line\"></div><div class=\"flex-row final-total\"><span>TOTAL</span><span>$155.99</span></div></div><div class=\"line\"></div><div class=\"center small\">Paid By: Credit</div><div class=\"center small\" style=\"margin-top: 15px;\">Credit Card: ****1234<br>Transaction ID: 234-567890<br>Approval Code: 123456</div><div class=\"line\"></div><div class=\"center small\">Thank You For Supporting<br>Local Business!</div>",
+  "numeroComanda": "4908",
+  "cuenta": "4530 - Orden 1",
+  "mesa": "MESA (4)",
+  "mesero": "PROMWEBSOFT",
+  "fechaPedido": "2021-12-10 11:06:35",
+  "productos": [
+    {
+      "cantidad": "-> 1.0",
+      "nombre": "BURRITO"
+    },
+    {
+      "cantidad": "-> 1.0", 
+      "nombre": "COCA COLA SIN AZUCRA 600ML"
+    },
+    {
+      "cantidad": "-> 1.0",
+      "nombre": "AREPA SOLO HUEVO"
+    },
+    {
+      "cantidad": "-> 1.0",
+      "nombre": "FRUTO PERA PEQUEÑO"
+    }
+  ],
+  "numeroImpresion": "1",
+  "fechaImpresion": "2021-12-10 11:15:11",
   "printerName": "EPSON TM-T20III Receipt"
 }'
 
+
+curl -X POST http://localhost:3000/print-factura \
+-H "Content-Type: application/json; charset=utf-8" \
+-d '{
+  "nombreNegocio": "BRAVA",
+  "direccion": "Echenique 54",
+  "ciudad": "Santiago", 
+  "telefono": "+56933988",
+  "productos": [
+    {
+      "descripcion": "Lorem ipsum x8",
+      "precio": "$1.25"
+    },
+    {
+      "descripcion": "Dolor sit amet x4",
+      "precio": "$7.99"
+    },
+    {
+      "descripcion": "Consectetur x2", 
+      "precio": "$26.70"
+    },
+    {
+      "descripcion": "Adipiscing elit x2",
+      "precio": "$15.49"
+    },
+    {
+      "descripcion": "Sed semper x2",
+      "precio": "$18.79"
+    },
+    {
+      "descripcion": "Accumsan ante x2",
+      "precio": "$42.99"
+    },
+    {
+      "descripcion": "Non laoreet x2",
+      "precio": "$9.99"
+    },
+    {
+      "descripcion": "Pul dapibus eu x2",
+      "precio": "$27.50"
+    }
+  ],
+  "subtotal": "$150.70",
+  "ivaPercent": "16",
+  "ivaValor": "$5.29", 
+  "total": "$155.99",
+  "propina": "$15.99",
+  "totaltotal": "$130.99",
+  "formaPago": "Credit",
+  "printerName": "EPSON TM-T20III Receipt"
+}'
 ```
 
 ```Bash

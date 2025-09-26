@@ -27,6 +27,281 @@ app.get("/printers", async (req, res) => {
   }
 });
 
+app.post("/print-comanda", async (req, res) => {
+  const {
+    printerName,
+    numeroComanda,
+    cuenta,
+    mesa,
+    mesero,
+    fechaPedido,
+    productos,
+    numeroImpresion,
+    fechaImpresion
+  } = req.body;
+
+  // Validar datos requeridos
+  if (!numeroComanda) return res.status(400).json({ error: "Falta parámetro 'numeroComanda'" });
+  if (!productos || !Array.isArray(productos)) return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
+
+  const pdfPath = "./comanda.pdf";
+
+  try {
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
+
+    // Generar filas de productos dinámicamente
+    const productosHtml = productos.map(producto => `
+      <tr>
+        <td>${producto.cantidad || '-> 1.0'}</td>
+        <td>${producto.nombre || ''}</td>
+      </tr>
+    `).join('');
+
+    const fullHtml = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Ticket</title>
+        <style>
+            .center {
+                text-align: center;
+            }
+            .bold {
+                font-weight: bold;
+            }
+            .small {
+                font-size: 12px;
+            }
+            .line {
+                border-bottom: 1px dashed #999;
+                margin: 10px 0;
+            }
+        </style>
+    </head>
+    <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
+        <div class="center bold">
+            COMANDA #${numeroComanda || ''}
+        </div>
+        <div class="line"></div>
+        <div class="small">
+            <div>Cuenta: ${cuenta || ''}</div>
+            <div>Mesa: ${mesa || ''}</div>
+            <div>Mesero: ${mesero || ''}</div>
+            <div>Fecha y hora del pedido: ${fechaPedido || ''}</div>
+        </div>
+        <div class="line"></div>
+        <table width="100%" class="small">
+            <tr class="bold">
+                <td>CANTIDAD</td>
+                <td>PRODUCTO</td>
+            </tr>
+            ${productosHtml}
+        </table>
+        <div class="line"></div>
+        <div class="center small">
+            Impresa # ${numeroImpresion || '1'}<br>
+            ${fechaImpresion || new Date().toLocaleString('es-ES')}
+        </div>
+    </body>
+    </html>
+    `;
+
+    await page.setContent(fullHtml, { waitUntil: 'domcontentloaded' });
+
+    await page.pdf({
+      path: pdfPath,
+      printBackground: true,
+      width: '3.15in',   // 80 mm
+      height: '11.69in', // 297 mm
+      margin: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
+
+    await browser.close();
+
+    await printer.print(pdfPath, printerName ? { printer: printerName } : {});
+    fs.unlinkSync(pdfPath);
+
+    res.json({ success: true, message: "Ticket enviado a imprimir correctamente" });
+
+  } catch (err) {
+    console.error("Error al imprimir:", err);
+    res.status(500).json({ error: "Error al imprimir", details: err.message });
+  }
+});
+
+app.post("/print-factura", async (req, res) => {
+  const {
+    printerName,
+    nombreNegocio,
+    direccion,
+    ciudad,
+    telefono,
+    productos,
+    subtotal,
+    ivaPercent,
+    ivaValor,
+    total,
+    formaPago,
+    propina,
+    totaltotal
+  } = req.body;
+
+  // Validar datos requeridos
+  if (!productos || !Array.isArray(productos)) {
+    return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
+  }
+
+  const pdfPath = "./factura.pdf";
+
+  try {
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
+
+    // Generar filas de productos dinámicamente
+    const productosHtml = productos.map(producto => `
+      <div class="flex-row small">
+        <span>${producto.descripcion || ''}</span>
+        <span>${producto.precio || ''}</span>
+      </div>
+    `).join('');
+
+    const fullHtml = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Factura</title>
+        <style>
+            .center {
+                text-align: center;
+            }
+            .bold {
+                font-weight: bold;
+            }
+            .small {
+                font-size: 10px;
+            }
+            .line {
+                border-bottom: 1px dashed #999;
+                margin: 10px 0;
+            }
+            .right {
+                text-align: right;
+            }
+            .flex-row {
+                display: flex;
+                justify-content: space-between;
+                margin: 2px 0;
+            }
+            .total-section {
+                margin-top: 15px;
+                padding-top: 10px;
+                border-top: 1px solid #999;
+            }
+            .final-total {
+                font-size: 14px;
+                font-weight: bold;
+                border-top: 2px solid #333;
+                padding-top: 5px;
+                margin-top: 5px;
+            }
+        </style>
+    </head>
+    <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
+        
+        <div class="center bold">
+            ${nombreNegocio || 'BRAVA'}
+        </div>
+        <div class="center small">
+            ${direccion || 'Echenique 54'}<br>
+            Suite 567<br>
+            ${ciudad || 'Santiago'}, State 54321<br>
+            ${telefono || '+56933988'}
+        </div>
+
+        <div class="line"></div>
+        <div class="flex-row small bold">
+          <span>PRODUCTO</span>
+          <span>PRECIO</span>
+        </div>
+        ${productosHtml}
+
+        <div class="line"></div>
+
+        <div class="total-section">
+            <div class="flex-row small">
+                <span>Sub Total</span>
+                <span>${subtotal || '$0.00'}</span>
+            </div>
+            <div class="flex-row small">
+                <span>IVA ${ivaPercent || '19'}%</span>
+                <span>${ivaValor || '$0.00'}</span>
+            </div>
+            <div class="line"></div>
+            <div class="flex-row small bold">
+                <span>TOTAL</span>
+                <span>${total || '$0.00'}</span>
+            </div>
+            <div class="flex-row small">
+                <span> PROPINA 10%</span>
+                <span>${propina || '$0.00'}</span>
+            </div>
+
+            <div class="flex-row final-total">
+                <span>TOTAL</span>
+                <span>${totaltotal || '$0.00'}</span>
+            </div>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="center small">
+            Forma Pago: ${formaPago || 'Efectivo'}
+        </div>
+
+        <div class="line"></div>
+
+        <div class="center small">
+            Gracias por su compra<br>
+        </div>
+        
+    </body>
+    </html>
+    `;
+
+    await page.setContent(fullHtml, { waitUntil: 'domcontentloaded' });
+
+    await page.pdf({
+      path: pdfPath,
+      printBackground: true,
+      width: '3.15in',   // 80 mm
+      height: '11.69in', // 297 mm
+      margin: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
+
+    await browser.close();
+
+    await printer.print(pdfPath, printerName ? { printer: printerName } : {});
+    fs.unlinkSync(pdfPath);
+
+    res.json({ success: true, message: "Factura enviada a imprimir correctamente" });
+
+  } catch (err) {
+    console.error("Error al imprimir factura:", err);
+    res.status(500).json({ error: "Error al imprimir factura", details: err.message });
+  }
+});
+
 // POST /print -> PDF
 app.post("/print", async (req, res) => {
 
@@ -38,19 +313,8 @@ app.post("/print", async (req, res) => {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
 
-    const fullHtml = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Ticket</title>
-    </head>
-    <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
-        ${html}
-    </body>
-    </html>
-    `;
+
+    const fullHtml = `Ejemoplo`;
     await page.setContent(fullHtml);
 
     await page.pdf({
@@ -121,5 +385,6 @@ app.post("/print/raw", async (req, res) => {
 // Servidor
 const PORT = 3000;
 app.listen(PORT, () =>
-  console.log(`API http://localhost:${PORT}`)
+  console.log(`API http://localhost:${PORT}/print-comanda`),
+  console.log(`API http://localhost:${PORT}/print-factura`)
 );
