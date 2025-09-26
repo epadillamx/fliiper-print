@@ -52,9 +52,13 @@ pm2 save
 ## Examples
 
 ```Bash
+
 curl -X POST http://localhost:3000/print \
 -H "Content-Type: application/json" \
--d '{"html":"<h1>Turno N° 1</h1><p>Sucursal Centro</p><div>26/06/2025</div>","printerName":"EPSON TM-T20III Receipt"}'
+-d '{
+  "html": "<body><div class=\"center bold\">PEDIDO (POR DEFECTO) #4908</div><div class=\"line\"></div><div class=\"small\"><div>Cuenta: 4530 - Orden 1</div><div>Mesa: MESA (4) - PRINCIPAL</div><div>Mesero: PROMWEBSOFT</div><div>Fecha y hora del pedido: 2021-12-10 11:06:35</div></div><div class=\"line\"></div><table width=\"100%\" class=\"small\"><tr class=\"bold\"><td>CANTIDAD</td><td>PRODUCTO</td></tr><tr><td>-> 1.0</td><td>BURRITO</td></tr><tr><td>-> 1.0</td><td>COCA COLA SIN AZUCRA 600ML</td></tr><tr><td>-> 1.0</td><td>AREPA SOLO HUEVO</td></tr><tr><td>-> 1.0</td><td>FRUTO PERA PEQUEÑO</td></tr></table><div class=\"line\"></div><div class=\"center small\">Impresa por primera vez<br>2021-12-10 11:15:11</div></body>",
+  "printerName": "EPSON TM-T20III Receipt"
+}'
 
 ```
 
