@@ -53,7 +53,7 @@ pm2 save
 
 ```Bash
 
-curl -X POST http://localhost:3000/printcomanda \
+curl -X POST http://localhost:3000/print-comanda \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "numeroComanda": "4908",
