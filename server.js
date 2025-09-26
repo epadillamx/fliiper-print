@@ -105,7 +105,7 @@ app.post("/print-comanda", async (req, res) => {
         </table>
         <div class="line"></div>
         <div class="center small">
-            Impresa # ${numeroImpresion || '1'}<br>
+            Cantidad de Impresiones: # ${numeroImpresion || '1'}<br>
             ${fechaImpresion || new Date().toLocaleString('es-ES')}
         </div>
     </body>
