@@ -30,8 +30,6 @@ app.get("/printers", async (req, res) => {
 // POST /print -> PDF
 app.post("/print", async (req, res) => {
 
-
-
   const { html, printerName } = req.body;
   if (!html) return res.status(400).json({ error: "Falta parámetro 'html'" });
 
@@ -39,8 +37,21 @@ app.post("/print", async (req, res) => {
   try {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-    // await page.setContent(html);
-    await page.setContent(`${html}`);
+
+    const fullHtml = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Ticket</title>
+    </head>
+    <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
+        ${html}
+    </body>
+    </html>
+    `;
+    await page.setContent(fullHtml);
 
     await page.pdf({
       path: pdfPath,
@@ -51,8 +62,6 @@ app.post("/print", async (req, res) => {
     });
 
     await browser.close();
-
-    //if(process.development==='production')
 
     await printer.print(pdfPath, printerName ? { printer: printerName } : {});
     fs.unlinkSync(pdfPath);
