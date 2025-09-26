@@ -25,12 +25,15 @@ npm install cors
 ms-windows-store://pdp/?ProductId=9mvs1j51gmk6
 
 ```
-```Bash
-pm2 save
-pm2-windows-startup install
+Presiona Win + R, escribe shell:startup y presiona Enter
+Copia el archivo startup.bat a esa carpeta
+Edita la ruta en el archivo .bat con la ruta real de tu proyecto
 
-pm2 status
-pm2 logs ngrok-tunnel
+```Bash
+@echo off
+cd /d "C:\app\fliiper-print"
+pm2 start ecosystem.config.js
+timeout /t 3 >nul
 
 ```
 
@@ -64,7 +67,7 @@ pm2 save
 
 ```Bash
 
-curl -X POST https://585a1cf81130.ngrok-free.app/print-comanda \
+curl -X POST https://foregoing-wilburn-healthily.ngrok-free.dev/print-comanda \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "numeroComanda": "4908",
@@ -96,7 +99,7 @@ curl -X POST https://585a1cf81130.ngrok-free.app/print-comanda \
 }'
 
 
-curl -X POST http://localhost:3000/print-factura \
+curl -X POST http://foregoing-wilburn-healthily.ngrok-free.dev/print-factura \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "nombreNegocio": "BRAVA",
