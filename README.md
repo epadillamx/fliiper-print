@@ -20,6 +20,7 @@ Imprimi comandas y cuentas
 
 ```Bash
 npm install escpos escpos-usb
+npm install cors
 
 ```
 

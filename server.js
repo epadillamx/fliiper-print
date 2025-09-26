@@ -3,8 +3,14 @@ const bodyParser = require("body-parser");
 const puppeteer = require("puppeteer");
 const printer = require("pdf-to-printer");
 const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
+app.use(cors({
+  origin: '*', // Acepta cualquier dominio
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
 app.use(bodyParser.json({ limit: "5mb" })); // soporta JSON grande
 
 // Detectar Windows
@@ -140,8 +146,6 @@ app.post("/print-factura", async (req, res) => {
     printerName,
     nombreNegocio,
     direccion,
-    ciudad,
-    telefono,
     productos,
     subtotal,
     ivaPercent,
@@ -380,8 +384,11 @@ app.post("/print/raw", async (req, res) => {
 });
 
 // Servidor
-const PORT = 3000;
-app.listen(PORT, () =>
-  console.log(`API http://localhost:${PORT}/print-comanda`),
-  console.log(`API http://localhost:${PORT}/print-factura`)
-);
+const PORT  = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
+  console.log(`📄 API Comanda: http://localhost:${PORT}/print-comanda`);
+  console.log(`🧾 API Factura: http://localhost:${PORT}/print-factura`);
+  console.log(`🖨️  API Impresoras: http://localhost:${PORT}/printers`);
+  console.log(`✅ CORS habilitado para desarrollo`);
+});
