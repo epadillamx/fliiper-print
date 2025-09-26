@@ -224,9 +224,6 @@ app.post("/print-factura", async (req, res) => {
         </div>
         <div class="center small">
             ${direccion || 'Echenique 54'}<br>
-            Suite 567<br>
-            ${ciudad || 'Santiago'}, State 54321<br>
-            ${telefono || '+56933988'}
         </div>
 
         <div class="line"></div>

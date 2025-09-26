@@ -90,8 +90,6 @@ curl -X POST http://localhost:3000/print-factura \
 -d '{
   "nombreNegocio": "BRAVA",
   "direccion": "Echenique 54",
-  "ciudad": "Santiago", 
-  "telefono": "+56933988",
   "productos": [
     {
       "descripcion": "Lorem ipsum x8",
