@@ -15,7 +15,7 @@ module.exports = {
     {
       name: 'ngrok-tunnel',
       script: 'cmd',
-      args: '/c ngrok http 3000',
+      args: '/c ngrok http 3000 --domain=foregoing-wilburn-healthily.ngrok-free.dev',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',

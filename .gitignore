@@ -4,5 +4,10 @@
 
 .env
 
+comanda.pdf
+ticket.pdf
+
 /bin/
 /lib/
+
+/logs/
