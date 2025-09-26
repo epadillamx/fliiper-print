@@ -40,19 +40,7 @@ app.post("/print", async (req, res) => {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     // await page.setContent(html);
-    await page.setContent(`
-      <style>
-        body {
-          font-family: Arial;
-          font-size: 14px;
-          margin: 0;
-          padding: 0;
-        }
-        h1 { font-size: 28px; margin: 0; padding: 0; }
-        .footer { font-size: 12px; text-align: right; margin: 0; padding: 0; }
-      </style>
-      ${html}
-    `);
+    await page.setContent(`${html}`);
 
     await page.pdf({
       path: pdfPath,
@@ -64,10 +52,10 @@ app.post("/print", async (req, res) => {
 
     await browser.close();
 
-    if(process.development==='production')
+    //if(process.development==='production')
 
-      await printer.print(pdfPath, printerName ? { printer: printerName } : {});
-      fs.unlinkSync(pdfPath);
+    await printer.print(pdfPath, printerName ? { printer: printerName } : {});
+    fs.unlinkSync(pdfPath);
 
     res.json({ success: true, message: "Ticket enviado a imprimir (PDF)" });
   } catch (err) {
