@@ -111,7 +111,6 @@ app.post("/print-comanda", async (req, res) => {
         </table>
         <div class="line"></div>
         <div class="center small">
-            Cantidad de Impresiones: # ${numeroImpresion || '1'}<br>
             ${fechaImpresion || new Date().toLocaleString('es-ES')}
         </div>
     </body>
@@ -224,10 +223,10 @@ app.post("/print-factura", async (req, res) => {
     <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
         
         <div class="center bold">
-            ${nombreNegocio || 'BRAVA'}
+            Ceci & ñonga
         </div>
         <div class="center small">
-            ${direccion || 'Echenique 54'}<br>
+          Av. Acozac esq. Prolongación Morelos.  s/n C.P. 56530 Ixtapaluca, Estado de México<br>
         </div>
 
         <div class="line"></div>
@@ -252,10 +251,6 @@ app.post("/print-factura", async (req, res) => {
             <div class="flex-row small bold">
                 <span>TOTAL</span>
                 <span>${total || '$0.00'}</span>
-            </div>
-            <div class="flex-row small">
-                <span> PROPINA 10%</span>
-                <span>${propina || '$0.00'}</span>
             </div>
 
             <div class="flex-row final-total">
