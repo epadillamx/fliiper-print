@@ -43,29 +43,77 @@ app.post("/print-comanda", async (req, res) => {
     fechaPedido,
     productos,
     numeroImpresion,
-    fechaImpresion
+    fechaImpresion,
+    comentarios, // <-- NUEVO: array opcional de strings
   } = req.body;
 
   // Validar datos requeridos
   if (!numeroComanda) return res.status(400).json({ error: "Falta parámetro 'numeroComanda'" });
   if (!productos || !Array.isArray(productos)) return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
 
+  // --- Helpers de sanitización (defensivo) ---
+  const esc = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const normStr = (s) => esc((s ?? "").toString().trim());
+  const normArr = (arr) =>
+    Array.isArray(arr)
+      ? arr
+          .map((x) => normStr(x))
+          .filter((x) => x.length > 0)
+          .slice(0, 50)
+      : [];
+
+  const safeProductos = Array.isArray(productos) ? productos : [];
+  const safeComentarios = normArr(comentarios);
+
   const pdfPath = "./comanda.pdf";
 
   try {
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();
 
     // Generar filas de productos dinámicamente
-    const productosHtml = productos.map(producto => `
-      <tr>
-        <td>${producto.cantidad || '-> 1.0'}</td>
-        <td>${producto.nombre || ''}</td>
-      </tr>
-    `).join('');
+    const productosHtml = safeProductos
+      .map((producto) => {
+        const cantidad = normStr(producto?.cantidad ?? "-> 1.0");
+        const nombre = normStr(producto?.nombre ?? "");
+        return `
+          <tr>
+            <td>${cantidad}</td>
+            <td>${nombre}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    // Bloque de comentarios (opcional)
+    const comentariosBlock = safeComentarios.length
+      ? `
+      <div class="line"></div>
+      <div class="small bold">COMENTARIOS</div>
+      <table width="100%" class="small">
+        ${safeComentarios
+          .map(
+            (c) => `
+            <tr>
+              <td style="width:10px;">•</td>
+              <td>${c}</td>
+            </tr>
+          `
+          )
+          .join("")}
+      </table>
+      `
+      : "";
 
     const fullHtml = `
     <!DOCTYPE html>
@@ -75,56 +123,50 @@ app.post("/print-comanda", async (req, res) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Ticket</title>
         <style>
-            .center {
-                text-align: center;
-            }
-            .bold {
-                font-weight: bold;
-            }
-            .small {
-                font-size: 12px;
-            }
-            .line {
-                border-bottom: 1px dashed #999;
-                margin: 10px 0;
-            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .small { font-size: 12px; }
+            .line { border-bottom: 1px dashed #999; margin: 10px 0; }
+            body { margin: 0; padding: 10px; font-family: 'Courier New', monospace; }
+            table { border-collapse: collapse; }
+            td { vertical-align: top; }
         </style>
     </head>
-    <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
-        <div class="center bold">
-            COMANDA #${numeroComanda || ''}
-        </div>
+    <body>
+        <div class="center bold">COMANDA #${normStr(numeroComanda)}</div>
         <div class="line"></div>
         <div class="small">
-            <div>Cuenta: ${cuenta || ''}</div>
-            <div>Mesa: ${mesa || ''}</div>
-            <div>Mesero: ${mesero || ''}</div>
-            <div>Fecha y hora del pedido: ${fechaPedido || ''}</div>
+            <div>Cuenta: ${normStr(cuenta)}</div>
+            <div>Mesa: ${normStr(mesa)}</div>
+            <div>Mesero: ${normStr(mesero)}</div>
+            <div>Fecha y hora del pedido: ${normStr(fechaPedido)}</div>
         </div>
         <div class="line"></div>
         <table width="100%" class="small">
             <tr class="bold">
-                <td>CANTIDAD</td>
+                <td style="width:80px;">CANTIDAD</td>
                 <td>PRODUCTO</td>
             </tr>
             ${productosHtml}
         </table>
+        ${comentariosBlock}
         <div class="line"></div>
         <div class="center small">
-            ${fechaImpresion || new Date().toLocaleString('es-ES')}
+            Cantidad de Impresiones: # ${normStr(numeroImpresion ?? "1")}<br>
+            ${normStr(fechaImpresion ?? new Date().toLocaleString("es-ES"))}
         </div>
     </body>
     </html>
     `;
 
-    await page.setContent(fullHtml, { waitUntil: 'domcontentloaded' });
+    await page.setContent(fullHtml, { waitUntil: "domcontentloaded" });
 
     await page.pdf({
       path: pdfPath,
       printBackground: true,
-      width: '3.15in',   // 80 mm
-      height: '11.69in', // 297 mm
-      margin: { top: 0, bottom: 0, left: 0, right: 0 }
+      width: "3.15in",   // 80 mm
+      height: "11.69in", // 297 mm
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
     });
 
     await browser.close();
@@ -133,7 +175,6 @@ app.post("/print-comanda", async (req, res) => {
     fs.unlinkSync(pdfPath);
 
     res.json({ success: true, message: "Ticket enviado a imprimir correctamente" });
-
   } catch (err) {
     console.error("Error al imprimir:", err);
     res.status(500).json({ error: "Error al imprimir", details: err.message });
