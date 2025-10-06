@@ -232,7 +232,7 @@ app.post("/print-factura", async (req, res) => {
     // - con propina: "IVA incluido - sin propina"
     // - sin propina: "IVA incluido"
     const totalSinPropinaLabel = showPropina
-      ? "TOTAL (IVA incluido - sin propina)"
+      ? "TOTAL (IVA incluido. Sin propina)"
       : "TOTAL (IVA incluido)";
 
     const fullHtml = `
