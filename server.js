@@ -190,13 +190,13 @@ app.post("/print-factura", async (req, res) => {
     subtotal,
     ivaPercent,
     ivaValor,
-    total,
+    total,        // total SIN propina
     formaPago,
-    propina,
-    totaltotal
+    propina,      // monto formateado
+    totaltotal,   // total CON propina formateado
+    tipPercent    // puede venir como number o string ("10")
   } = req.body;
 
-  // Validar datos requeridos
   if (!productos || !Array.isArray(productos)) {
     return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
   }
@@ -205,125 +205,121 @@ app.post("/print-factura", async (req, res) => {
 
   try {
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();
 
-    // Generar filas de productos dinámicamente
-    const productosHtml = productos.map(producto => `
+    const productosHtml = productos.map(p => `
       <div class="flex-row small">
-        <span>${producto.descripcion || ''}</span>
-        <span>${producto.precio || ''}</span>
+        <span>${p.descripcion || ""}</span>
+        <span>${p.precio || ""}</span>
       </div>
-    `).join('');
+    `).join("");
+
+    // Mostrar bloque de propina sólo si hay propina y total con propina
+    const showPropina = !!propina && !!totaltotal;
+
+    // tipPercent como número válido (10 o "10")
+    const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
+    const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
+
+    const tipLabel = hasValidTipPercent
+      ? `Propina (${Math.round(tipPercentNum)}%)`
+      : "Propina";
+
+    // Etiqueta del total sin propina:
+    // - con propina: "IVA incluido - sin propina"
+    // - sin propina: "IVA incluido"
+    const totalSinPropinaLabel = showPropina
+      ? "TOTAL (IVA incluido - sin propina)"
+      : "TOTAL (IVA incluido)";
 
     const fullHtml = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1.0" />
         <title>Factura</title>
         <style>
-            .center {
-                text-align: center;
-            }
-            .bold {
-                font-weight: bold;
-            }
-            .small {
-                font-size: 10px;
-            }
-            .line {
-                border-bottom: 1px dashed #999;
-                margin: 10px 0;
-            }
-            .right {
-                text-align: right;
-            }
-            .flex-row {
-                display: flex;
-                justify-content: space-between;
-                margin: 2px 0;
-            }
-            .total-section {
-                margin-top: 15px;
-                padding-top: 10px;
-                border-top: 1px solid #999;
-            }
-            .final-total {
-                font-size: 14px;
-                font-weight: bold;
-                border-top: 2px solid #333;
-                padding-top: 5px;
-                margin-top: 5px;
-            }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .small { font-size: 10px; }
+          .line { border-bottom: 1px dashed #999; margin: 10px 0; }
+          .flex-row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; }
+          .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }
         </style>
     </head>
     <body style="margin: 0; padding: 10px; font-family: 'Courier New', monospace;">
-        
-        <div class="center bold">
-            Ceci & ñonga
+      <div class="center bold">${nombreNegocio || ""}</div>
+      <div class="center small">${direccion || ""}<br/></div>
+
+      <div class="line"></div>
+
+      <div class="flex-row small bold">
+        <span>PRODUCTO</span>
+        <span>PRECIO</span>
+      </div>
+      ${productosHtml}
+
+      <div class="line"></div>
+
+      <div class="total-section">
+        <div class="flex-row small">
+          <span>Sub Total</span>
+          <span>${subtotal || "$0.00"}</span>
         </div>
-        <div class="center small">
-          Av. Acozac esq. Prolongación Morelos.  s/n C.P. 56530 Ixtapaluca, Estado de México<br>
+        <div class="flex-row small">
+          <span>IVA ${ivaPercent ?? "19"}%</span>
+          <span>${ivaValor || "$0.00"}</span>
         </div>
 
         <div class="line"></div>
+
+        <!-- Total SIN propina -->
         <div class="flex-row small bold">
-          <span>PRODUCTO</span>
-          <span>PRECIO</span>
-        </div>
-        ${productosHtml}
-
-        <div class="line"></div>
-
-        <div class="total-section">
-            <div class="flex-row small">
-                <span>Sub Total</span>
-                <span>${subtotal || '$0.00'}</span>
-            </div>
-            <div class="flex-row small">
-                <span>IVA ${ivaPercent || '19'}%</span>
-                <span>${ivaValor || '$0.00'}</span>
-            </div>
-            <div class="line"></div>
-            <div class="flex-row small bold">
-                <span>TOTAL</span>
-                <span>${total || '$0.00'}</span>
-            </div>
-
-            <div class="flex-row final-total">
-                <span>TOTAL</span>
-                <span>${totaltotal || '$0.00'}</span>
-            </div>
+          <span>${totalSinPropinaLabel}</span>
+          <span>${total || "$0.00"}</span>
         </div>
 
-        <div class="line"></div>
+        ${
+          showPropina
+            ? `
+          <div class="flex-row small">
+            <span>${tipLabel}</span>
+            <span>${propina}</span>
+          </div>
 
-        <div class="center small">
-            Forma Pago: ${formaPago || 'Efectivo'}
-        </div>
+          <div class="flex-row final-total">
+            <span>TOTAL (IVA + propina)</span>
+            <span>${totaltotal}</span>
+          </div>
+        `
+            : ""
+        }
+      </div>
 
-        <div class="line"></div>
+      <div class="line"></div>
 
-        <div class="center small">
-            Gracias por su compra<br>
-        </div>
-        
+      <div class="center small">Forma Pago: ${formaPago || "Efectivo"}</div>
+
+      <div class="line"></div>
+
+      <div class="center small">Gracias por su compra<br/></div>
     </body>
     </html>
     `;
 
-    await page.setContent(fullHtml, { waitUntil: 'domcontentloaded' });
+    await page.setContent(fullHtml, { waitUntil: "domcontentloaded" });
 
     await page.pdf({
       path: pdfPath,
       printBackground: true,
-      width: '3.15in',   // 80 mm
-      height: '11.69in', // 297 mm
-      margin: { top: 0, bottom: 0, left: 0, right: 0 }
+      width: "3.15in",     // 80 mm
+      height: "11.69in",   // 297 mm
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
     });
 
     await browser.close();
@@ -332,7 +328,6 @@ app.post("/print-factura", async (req, res) => {
     fs.unlinkSync(pdfPath);
 
     res.json({ success: true, message: "Factura enviada a imprimir correctamente" });
-
   } catch (err) {
     console.error("Error al imprimir factura:", err);
     res.status(500).json({ error: "Error al imprimir factura", details: err.message });
