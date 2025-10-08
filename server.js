@@ -190,15 +190,19 @@ app.post("/print-factura", async (req, res) => {
     subtotal,
     ivaPercent,
     ivaValor,
-    total,        // total SIN propina
+    descuentoPercent, // porcentaje de descuento
+    descuentoValor, // valor formateado del descuento
+    total, // total SIN propina
     formaPago,
-    propina,      // monto formateado
-    totaltotal,   // total CON propina formateado
-    tipPercent    // puede venir como number o string ("10")
+    propina, // monto formateado
+    totaltotal, // total CON propina formateado
+    tipPercent, // puede venir como number o string ("10")
   } = req.body;
 
   if (!productos || !Array.isArray(productos)) {
-    return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
+    return res
+      .status(400)
+      .json({ error: "Falta parámetro 'productos' como array" });
   }
 
   const pdfPath = "./factura.pdf";
@@ -210,23 +214,41 @@ app.post("/print-factura", async (req, res) => {
 
     const page = await browser.newPage();
 
-    const productosHtml = productos.map(p => `
+    const productosHtml = productos
+      .map(
+        (p) => `
       <div class="flex-row small">
         <span>${p.descripcion || ""}</span>
         <span>${p.precio || ""}</span>
       </div>
-    `).join("");
+    `
+      )
+      .join("");
 
     // Mostrar bloque de propina sólo si hay propina y total con propina
     const showPropina = !!propina && !!totaltotal;
 
     // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
-    const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
+    const hasValidTipPercent =
+      Number.isFinite(tipPercentNum) && tipPercentNum > 0;
 
     const tipLabel = hasValidTipPercent
       ? `Propina (${Math.round(tipPercentNum)}%)`
       : "Propina";
+
+    // Mostrar descuento si hay valores
+    const showDescuento = !!descuentoValor;
+
+    // descuentoPercent como número válido
+    const descuentoPercentNum =
+      descuentoPercent === 0 ? 0 : Number(descuentoPercent);
+    const hasValidDescuentoPercent =
+      Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
+
+    const descuentoLabel = hasValidDescuentoPercent
+      ? `Descuento (${Math.round(descuentoPercentNum)}%)`
+      : "Descuento";
 
     // Etiqueta del total sin propina:
     // - con propina: "IVA incluido - sin propina"
@@ -275,6 +297,16 @@ app.post("/print-factura", async (req, res) => {
           <span>IVA ${ivaPercent ?? "19"}%</span>
           <span>${ivaValor || "$0.00"}</span>
         </div>
+        ${
+          showDescuento
+            ? `
+        <div class="flex-row small">
+          <span>${descuentoLabel}</span>
+          <span>-${descuentoValor}</span>
+        </div>
+        `
+            : ""
+        }
 
         <div class="line"></div>
 
@@ -317,8 +349,8 @@ app.post("/print-factura", async (req, res) => {
     await page.pdf({
       path: pdfPath,
       printBackground: true,
-      width: "3.15in",     // 80 mm
-      height: "11.69in",   // 297 mm
+      width: "3.15in", // 80 mm
+      height: "11.69in", // 297 mm
       margin: { top: 0, bottom: 0, left: 0, right: 0 },
     });
 
@@ -327,10 +359,15 @@ app.post("/print-factura", async (req, res) => {
     await printer.print(pdfPath, printerName ? { printer: printerName } : {});
     fs.unlinkSync(pdfPath);
 
-    res.json({ success: true, message: "Factura enviada a imprimir correctamente" });
+    res.json({
+      success: true,
+      message: "Factura enviada a imprimir correctamente",
+    });
   } catch (err) {
     console.error("Error al imprimir factura:", err);
-    res.status(500).json({ error: "Error al imprimir factura", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Error al imprimir factura", details: err.message });
   }
 });
 
