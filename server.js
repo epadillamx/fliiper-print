@@ -191,12 +191,12 @@ app.post("/print-factura", async (req, res) => {
     ivaPercent,
     ivaValor,
     descuentoPercent, // porcentaje de descuento
-    descuentoValor, // valor formateado del descuento
-    total, // total SIN propina
+    descuentoValor,   // valor formateado del descuento
+    total,            // total SIN propina
     formaPago,
-    propina, // monto formateado
-    totaltotal, // total CON propina formateado
-    tipPercent, // puede venir como number o string ("10")
+    propina,          // monto formateado
+    totaltotal,       // total CON propina formateado
+    tipPercent,       // puede venir como number o string ("10")
   } = req.body;
 
   if (!productos || !Array.isArray(productos)) {
@@ -214,16 +214,36 @@ app.post("/print-factura", async (req, res) => {
 
     const page = await browser.newPage();
 
+    // Genera cada línea con el formato:
+    //   "Descripción   $unit  xN"  |  "$TOTAL"
+    // Nota: usamos &nbsp; para forzar un pequeño espacio visual en monospace.
     const productosHtml = productos
-      .map(
-        (p) => `
-      <div class="product-row small">
-        <span class="product-desc">${p.descripcion || ""}</span>
-        <span class="product-unit">${p.precioUnitario || ""}</span>
-        <span class="product-total">${p.precio || ""}</span>
-      </div>
-    `
-      )
+      .map((p) => {
+        const desc = (p?.descripcion ?? "").toString();
+        const unit = (p?.unit ?? "").toString().trim();  // opcional
+        const qty  = (p?.qty  ?? "").toString().trim();  // opcional
+
+        // Construye el texto izquierdo sin cambiar la estructura (sigue siendo 2 columnas)
+        // desc  +  (unit si viene)  +  (xN si viene)
+        // Ej: "Coca Cola  $25.00 x3"
+        const parts = [desc];
+
+        if (unit) {
+          parts.push("&nbsp;&nbsp;" + unit);
+        }
+        if (qty) {
+          parts.push("&nbsp;&nbsp;x" + qty);
+        }
+
+        const leftText = parts.join("");
+
+        return `
+          <div class="flex-row small">
+            <span>${leftText}</span>
+            <span>${p?.precio || ""}</span>
+          </div>
+        `;
+      })
       .join("");
 
     // Mostrar bloque de propina sólo si hay propina y total con propina
@@ -252,7 +272,7 @@ app.post("/print-factura", async (req, res) => {
       : "Descuento";
 
     // Etiqueta del total sin propina:
-    // - con propina: "IVA incluido - sin propina"
+    // - con propina: "IVA incluido. Sin propina"
     // - sin propina: "IVA incluido"
     const totalSinPropinaLabel = showPropina
       ? "TOTAL (IVA incluido. Sin propina)"
