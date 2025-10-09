@@ -247,7 +247,7 @@ app.post("/print-factura", async (req, res) => {
       .join("");
 
     // Mostrar bloque de propina sólo si hay propina y total con propina
-    const showPropina = !!propina && !!totaltotal;
+    const showPropina = !!propina && !!totaltotal && propina!=0.0;
 
     // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
