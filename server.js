@@ -217,9 +217,10 @@ app.post("/print-factura", async (req, res) => {
     const productosHtml = productos
       .map(
         (p) => `
-      <div class="flex-row small">
-        <span>${p.descripcion || ""}</span>
-        <span>${p.precio || ""}</span>
+      <div class="product-row small">
+        <span class="product-desc">${p.descripcion || ""}</span>
+        <span class="product-unit">${p.precioUnitario || ""}</span>
+        <span class="product-total">${p.precio || ""}</span>
       </div>
     `
       )
@@ -270,6 +271,10 @@ app.post("/print-factura", async (req, res) => {
           .small { font-size: 10px; }
           .line { border-bottom: 1px dashed #999; margin: 10px 0; }
           .flex-row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .product-row { display: flex; justify-content: space-between; margin: 2px 0; gap: 5px; }
+          .product-desc { flex: 1; text-align: left; }
+          .product-unit { width: 60px; text-align: right; }
+          .product-total { width: 60px; text-align: right; }
           .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; }
           .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }
         </style>
@@ -280,9 +285,10 @@ app.post("/print-factura", async (req, res) => {
 
       <div class="line"></div>
 
-      <div class="flex-row small bold">
-        <span>PRODUCTO</span>
-        <span>PRECIO</span>
+      <div class="product-row small bold">
+        <span class="product-desc">PRODUCTO</span>
+        <span class="product-unit">P. UNIT</span>
+        <span class="product-total">TOTAL</span>
       </div>
       ${productosHtml}
 
