@@ -35,7 +35,7 @@ app.get("/printers", async (req, res) => {
 
 app.post("/print-comanda", async (req, res) => {
   const {
-    printerName,
+    printerName = 'EPSON TM-T20III Receipt',
     numeroComanda,
     cuenta,
     mesa,
@@ -183,7 +183,7 @@ app.post("/print-comanda", async (req, res) => {
 
 app.post("/print-factura", async (req, res) => {
   const {
-    printerName,
+    printerName = 'EPSON TM-T20III Receipt',
     nombreNegocio,
     direccion,
     productos,
