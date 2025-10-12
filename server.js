@@ -275,8 +275,8 @@ app.post("/print-factura", async (req, res) => {
     // - con propina: "IVA incluido. Sin propina"
     // - sin propina: "IVA incluido"
     const totalSinPropinaLabel = showPropina
-      ? "TOTAL (IVA incluido. Sin propina)"
-      : "TOTAL (IVA incluido)";
+      ? "TOTAL"
+      : "TOTAL";
 
     const fullHtml = `
     <!DOCTYPE html>
@@ -318,6 +318,15 @@ app.post("/print-factura", async (req, res) => {
           <span>IVA ${ivaPercent ?? "19"}%</span>
           <span>${ivaValor || "$0.00"}</span>
         </div>
+
+        <!-- Total (IVA incluido) -->
+        <div class="flex-row small bold">
+          <span>${totalSinPropinaLabel}</span>
+          <span>${total || "$0.00"}</span>
+        </div>
+
+        ${showDescuento || showPropina ? `<div class="line"></div>` : ""}
+
         ${
           showDescuento
             ? `
@@ -329,14 +338,6 @@ app.post("/print-factura", async (req, res) => {
             : ""
         }
 
-        <div class="line"></div>
-
-        <!-- Total SIN propina -->
-        <div class="flex-row small bold">
-          <span>${totalSinPropinaLabel}</span>
-          <span>${total || "$0.00"}</span>
-        </div>
-
         ${
           showPropina
             ? `
@@ -344,6 +345,8 @@ app.post("/print-factura", async (req, res) => {
             <span>${tipLabel}</span>
             <span>${propina}</span>
           </div>
+
+          <div class="line"></div>
 
           <div class="flex-row final-total">
             <span>TOTAL (IVA + propina)</span>
