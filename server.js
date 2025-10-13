@@ -36,7 +36,7 @@ app.get("/printers", async (req, res) => {
 app.post("/print-comanda", async (req, res) => {
   console.log(req.body)
   const {
-    printerName,
+    printerName = 'EPSON TM-T20III Receipt',
     numeroComanda,
     cuenta,
     mesa,
@@ -183,7 +183,7 @@ app.post("/print-comanda", async (req, res) => {
 
 app.post("/print-factura", async (req, res) => {
   const {
-    printerName,
+    printerName = 'EPSON TM-T20III Receipt',
     nombreNegocio,
     direccion,
     productos,
@@ -240,7 +240,10 @@ app.post("/print-factura", async (req, res) => {
       })
       .join("");
 
-    const showPropina = !!propina && !!totaltotal;
+    // Mostrar bloque de propina sólo si hay propina y total con propina
+    const showPropina = !!propina && !!totaltotal && propina!=0.0;
+
+    // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
     const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
     const tipLabel = hasValidTipPercent ? `Propina (${Math.round(tipPercentNum)}%)` : "Propina";
@@ -251,8 +254,8 @@ app.post("/print-factura", async (req, res) => {
     const descuentoLabel = hasValidDescuentoPercent ? `Descuento (${Math.round(descuentoPercentNum)}%)` : "Descuento";
 
     const totalSinPropinaLabel = showPropina
-      ? "TOTAL (IVA incluido. Sin propina)"
-      : "TOTAL (IVA incluido)";
+      ? "TOTAL"
+      : "TOTAL";
 
     const headerOperativoHtml = `
       <div class="small">
@@ -311,24 +314,31 @@ app.post("/print-factura", async (req, res) => {
           <span>${normStr(ivaValor) || "$0.00"}</span>
         </div>
 
-        ${showDescuento ? `
+        <!-- Total (IVA incluido) -->
+        <div class="flex-row small bold">
+          <span>${totalSinPropinaLabel}</span>
+          <span>${total || "$0.00"}</span>
+        </div>
+
+        ${showDescuento || showPropina ? `<div class="line"></div>` : ""}
+
+        ${
+          showDescuento
+            ? `
         <div class="flex-row small">
           <span>${normStr(descuentoLabel)}</span>
           <span>-${normStr(descuentoValor)}</span>
         </div>` : ""}
 
-        <div class="line"></div>
-
-        <div class="flex-row small bold">
-          <span>${normStr(totalSinPropinaLabel)}</span>
-          <span>${normStr(total) || "$0.00"}</span>
-        </div>
-
-        ${showPropina ? `
+        ${
+          showPropina
+            ? `
           <div class="flex-row small">
             <span>${normStr(tipLabel)}</span>
             <span>${normStr(propina)}</span>
           </div>
+
+          <div class="line"></div>
 
           <div class="flex-row final-total">
             <span>TOTAL (IVA + propina)</span>
