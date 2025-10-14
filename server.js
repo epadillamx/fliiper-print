@@ -219,17 +219,19 @@ app.post("/print-factura", async (req, res) => {
   const pdfPath = "./factura.pdf";
 
   try {
-    const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
     const page = await browser.newPage();
 
     const productosHtml = productos
       .map((p) => {
         const desc = normStr(p?.descripcion ?? "");
         const unit = normStr(p?.unit ?? "");
-        const qty  = normStr(p?.qty  ?? "");
+        const qty = normStr(p?.qty ?? "");
         const parts = [desc];
         if (unit) parts.push("&nbsp;&nbsp;" + unit);
-        if (qty)  parts.push("&nbsp;&nbsp;x" + qty);
+        if (qty) parts.push("&nbsp;&nbsp;x" + qty);
         const leftText = parts.join("");
         return `
           <div class="flex-row small">
@@ -241,21 +243,29 @@ app.post("/print-factura", async (req, res) => {
       .join("");
 
     // Mostrar bloque de propina sólo si hay propina y total con propina
-    const showPropina = !!propina && !!totaltotal && propina!=0.0;
+    const showPropina = !!propina && !!totaltotal && propina != 0.0;
 
     // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
-    const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
-    const tipLabel = hasValidTipPercent ? `Propina (${Math.round(tipPercentNum)}%)` : "Propina";
+    const hasValidTipPercent =
+      Number.isFinite(tipPercentNum) && tipPercentNum > 0;
+    const tipLabel = hasValidTipPercent
+      ? `Propina (${Math.round(tipPercentNum)}%)`
+      : "Propina";
 
-    const showDescuento = !!descuentoValor;
-    const descuentoPercentNum = descuentoPercent === 0 ? 0 : Number(descuentoPercent);
-    const hasValidDescuentoPercent = Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
-    const descuentoLabel = hasValidDescuentoPercent ? `Descuento (${Math.round(descuentoPercentNum)}%)` : "Descuento";
+    const showDescuento = !!descuentoValor && descuentoValor != 0;
+    const descuentoPercentNum =
+      descuentoPercent === 0 ? 0 : Number(descuentoPercent);
+    const hasValidDescuentoPercent =
+      Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
+    const descuentoLabel = hasValidDescuentoPercent
+      ? `Descuento (${Math.round(descuentoPercentNum)}%)`
+      : "Descuento";
 
-    const totalSinPropinaLabel = showPropina
-      ? "TOTAL"
-      : "TOTAL";
+    // Mostrar TOTAL normal solo si no hay descuento ni propina
+    // Si hay descuento o propina, el total con IVA será un subtotal intermedio
+    const totalSinPropinaLabel =
+      showDescuento || showPropina ? "Total con IVA" : "TOTAL";
 
     const headerOperativoHtml = `
       <div class="small">
@@ -266,7 +276,9 @@ app.post("/print-factura", async (req, res) => {
 
     const footerFechaHtml = `
       <div class="line"></div>
-      <div class="center small">${normStr(fechaImpresion || new Date().toLocaleString("es-CL"))}</div>
+      <div class="center small">${normStr(
+        fechaImpresion || new Date().toLocaleString("es-CL")
+      )}</div>
     `;
 
     const fullHtml = `
@@ -310,7 +322,9 @@ app.post("/print-factura", async (req, res) => {
           <span>${normStr(subtotal) || "$0.00"}</span>
         </div>
         <div class="flex-row small">
-          <span>IVA ${Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"}%</span>
+          <span>IVA ${
+            Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"
+          }%</span>
           <span>${normStr(ivaValor) || "$0.00"}</span>
         </div>
 
@@ -328,7 +342,9 @@ app.post("/print-factura", async (req, res) => {
         <div class="flex-row small">
           <span>${normStr(descuentoLabel)}</span>
           <span>-${normStr(descuentoValor)}</span>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
 
         ${
           showPropina
@@ -344,12 +360,25 @@ app.post("/print-factura", async (req, res) => {
             <span>TOTAL (IVA + propina)</span>
             <span>${normStr(totaltotal)}</span>
           </div>
-        ` : ""}
+        `
+            : showDescuento
+            ? `
+          <div class="line"></div>
+
+          <div class="flex-row final-total">
+            <span>TOTAL</span>
+            <span>${normStr(totaltotal || total)}</span>
+          </div>
+        `
+            : ""
+        }
       </div>
 
       <div class="line"></div>
 
-      <div class="center small">Forma Pago: ${normStr(formaPago) || "Efectivo"}</div>
+      <div class="center small">Forma Pago: ${
+        normStr(formaPago) || "Efectivo"
+      }</div>
 
       ${footerFechaHtml}
     </body>
@@ -371,7 +400,10 @@ app.post("/print-factura", async (req, res) => {
     await printer.print(pdfPath, printerName ? { printer: printerName } : {});
     fs.unlinkSync(pdfPath);
 
-    res.json({ success: true, message: "Factura enviada a imprimir correctamente" });
+    res.json({
+      success: true,
+      message: "Factura enviada a imprimir correctamente",
+    });
   } catch (err) {
     console.error("Error al imprimir factura:", err);
     res.status(500).json({ error: "Error al imprimir factura", details: err.message });
