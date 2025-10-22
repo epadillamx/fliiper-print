@@ -238,15 +238,15 @@ app.post("/print-factura", async (req, res) => {
       .map((p) => {
         const desc = normStr(p?.descripcion ?? "");
         const unit = normStr(p?.unit ?? "");
-        const qty  = normStr(p?.qty  ?? "");
+        const qty = normStr(p?.qty ?? "");
         const parts = [desc];
         if (unit) parts.push("&nbsp;&nbsp;" + unit);
-        if (qty)  parts.push("&nbsp;&nbsp;x" + qty);
+        if (qty) parts.push("&nbsp;&nbsp;x" + qty);
         const leftText = parts.join("");
         return `
           <div class="flex-row small">
-            <span>${leftText}</span>
-            <span>${normStr(p?.precio || "")}</span>
+            <span class="producto-nombre">${leftText}</span>
+            <span class="producto-precio">${normStr(p?.precio || "")}</span>
           </div>
         `;
       })
@@ -257,13 +257,20 @@ app.post("/print-factura", async (req, res) => {
 
     // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
-    const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
-    const tipLabel = hasValidTipPercent ? `Propina (${Math.round(tipPercentNum)}%)` : "Propina";
+    const hasValidTipPercent =
+      Number.isFinite(tipPercentNum) && tipPercentNum > 0;
+    const tipLabel = hasValidTipPercent
+      ? `Propina (${Math.round(tipPercentNum)}%)`
+      : "Propina";
 
     const showDescuento = !!descuentoValor;
-    const descuentoPercentNum = descuentoPercent === 0 ? 0 : Number(descuentoPercent);
-    const hasValidDescuentoPercent = Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
-    const descuentoLabel = hasValidDescuentoPercent ? `Descuento (${Math.round(descuentoPercentNum)}%)` : "Descuento";
+    const descuentoPercentNum =
+      descuentoPercent === 0 ? 0 : Number(descuentoPercent);
+    const hasValidDescuentoPercent =
+      Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
+    const descuentoLabel = hasValidDescuentoPercent
+      ? `Descuento (${Math.round(descuentoPercentNum)}%)`
+      : "Descuento";
 
     const totalSinPropinaLabel = "TOTAL";
 
@@ -276,11 +283,14 @@ app.post("/print-factura", async (req, res) => {
 
     const footerFechaHtml = `
       <div class="line"></div>
-      <div class="center small">${normStr(fechaImpresion || new Date().toLocaleString("es-CL"))}</div>
+      <div class="center small">${normStr(
+        fechaImpresion || new Date().toLocaleString("es-CL")
+      )}</div>
     `;
 
     // ===== IVA visible solo si > 0 =====
-    const showIvaBlock = Number.isFinite(Number(ivaPercent)) && Number(ivaPercent) > 0;
+    const showIvaBlock =
+      Number.isFinite(Number(ivaPercent)) && Number(ivaPercent) > 0;
 
     const ivaSectionHtml = showIvaBlock
       ? `
@@ -289,16 +299,21 @@ app.post("/print-factura", async (req, res) => {
           <span>${normStr(subtotal) || "$0.00"}</span>
         </div>
         <div class="flex-row small">
-          <span>IVA ${Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"}%</span>
+          <span>IVA ${
+            Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"
+          }%</span>
           <span>${normStr(ivaValor) || "$0.00"}</span>
         </div>
       `
       : "";
 
-    const finalTotalLabel =
-      showPropina
-        ? (showIvaBlock ? "TOTAL (IVA + propina)" : "TOTAL (propina)")
-        : (showIvaBlock ? "TOTAL (IVA)" : "TOTAL");
+    const finalTotalLabel = showPropina
+      ? showIvaBlock
+        ? "TOTAL (IVA + propina)"
+        : "TOTAL (propina)"
+      : showIvaBlock
+      ? "TOTAL (IVA)"
+      : "TOTAL";
 
     // === HTML de UNA PÁGINA (una copia) ===
     const onePageInner = () => `
@@ -334,7 +349,9 @@ app.post("/print-factura", async (req, res) => {
         <div class="flex-row small">
           <span>${normStr(descuentoLabel)}</span>
           <span>-${normStr(descuentoValor)}</span>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
 
         ${
           showPropina
@@ -350,18 +367,25 @@ app.post("/print-factura", async (req, res) => {
             <span>${normStr(finalTotalLabel)}</span>
             <span>${normStr(totaltotal)}</span>
           </div>
-        ` : "" }
+        `
+            : ""
+        }
       </div>
 
       <div class="line"></div>
 
-      <div class="center small">Forma Pago: ${normStr(formaPago) || "Efectivo"}</div>
+      <div class="center small">Forma Pago: ${
+        normStr(formaPago) || "Efectivo"
+      }</div>
 
       ${footerFechaHtml}
     `;
 
     // === Un SOLO documento con N páginas (una por copia) ===
-    const pagesHtml = Array.from({ length: copiesUsed }, () => `<section class="page">${onePageInner()}</section>`).join("");
+    const pagesHtml = Array.from(
+      { length: copiesUsed },
+      () => `<section class="page">${onePageInner()}</section>`
+    ).join("");
 
     const fullHtml = `
     <!DOCTYPE html>
@@ -380,6 +404,22 @@ app.post("/print-factura", async (req, res) => {
           .flex-row { display: flex; justify-content: space-between; margin: 2px 0; }
           .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; }
           .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }
+
+          /* Estilos para productos - permitir salto de línea */
+          .producto-nombre { 
+            flex: 1; 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            overflow-wrap: break-word;
+            padding-right: 5px;
+            max-width: calc(100% - 60px); /* Reserva espacio para el precio */
+          }
+          .producto-precio { 
+            flex-shrink: 0; 
+            text-align: right; 
+            white-space: nowrap;
+            min-width: 50px;
+          }
 
           /* 🔧 Importante: sin padding en body; el padding por página va en .page */
           body { margin: 0; padding: 0; font-family: 'Courier New', monospace; }
