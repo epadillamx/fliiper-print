@@ -201,12 +201,15 @@ app.post("/print-factura", async (req, res) => {
     empleadoNombre,
     fechaImpresion,
     numeroCuenta,
+    // 🆕 opcional
+    copies,
   } = req.body;
 
   if (!productos || !Array.isArray(productos)) {
     return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
   }
 
+  // ===== Helpers =====
   const esc = (s) =>
     String(s ?? "")
       .replace(/&/g, "&amp;")
@@ -216,46 +219,60 @@ app.post("/print-factura", async (req, res) => {
       .replace(/'/g, "&#39;");
   const normStr = (s) => esc((s ?? "").toString().trim());
 
+  const normalizeCopies = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return 1;
+    return Math.min(20, Math.floor(n)); // cap de seguridad
+  };
+
+  const copiesUsed = normalizeCopies(copies);
   const pdfPath = "./factura.pdf";
 
   try {
-    const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
     const page = await browser.newPage();
 
     const productosHtml = productos
       .map((p) => {
         const desc = normStr(p?.descripcion ?? "");
         const unit = normStr(p?.unit ?? "");
-        const qty  = normStr(p?.qty  ?? "");
+        const qty = normStr(p?.qty ?? "");
         const parts = [desc];
         if (unit) parts.push("&nbsp;&nbsp;" + unit);
-        if (qty)  parts.push("&nbsp;&nbsp;x" + qty);
+        if (qty) parts.push("&nbsp;&nbsp;x" + qty);
         const leftText = parts.join("");
         return `
           <div class="flex-row small">
-            <span>${leftText}</span>
-            <span>${normStr(p?.precio || "")}</span>
+            <span class="producto-nombre">${leftText}</span>
+            <span class="producto-precio">${normStr(p?.precio || "")}</span>
           </div>
         `;
       })
       .join("");
 
     // Mostrar bloque de propina sólo si hay propina y total con propina
-    const showPropina = !!propina && !!totaltotal && propina!=0.0;
+    const showPropina = !!propina && !!totaltotal && propina != 0.0;
 
     // tipPercent como número válido (10 o "10")
     const tipPercentNum = tipPercent === 0 ? 0 : Number(tipPercent);
-    const hasValidTipPercent = Number.isFinite(tipPercentNum) && tipPercentNum > 0;
-    const tipLabel = hasValidTipPercent ? `Propina (${Math.round(tipPercentNum)}%)` : "Propina";
+    const hasValidTipPercent =
+      Number.isFinite(tipPercentNum) && tipPercentNum > 0;
+    const tipLabel = hasValidTipPercent
+      ? `Propina (${Math.round(tipPercentNum)}%)`
+      : "Propina";
 
     const showDescuento = !!descuentoValor;
-    const descuentoPercentNum = descuentoPercent === 0 ? 0 : Number(descuentoPercent);
-    const hasValidDescuentoPercent = Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
-    const descuentoLabel = hasValidDescuentoPercent ? `Descuento (${Math.round(descuentoPercentNum)}%)` : "Descuento";
+    const descuentoPercentNum =
+      descuentoPercent === 0 ? 0 : Number(descuentoPercent);
+    const hasValidDescuentoPercent =
+      Number.isFinite(descuentoPercentNum) && descuentoPercentNum > 0;
+    const descuentoLabel = hasValidDescuentoPercent
+      ? `Descuento (${Math.round(descuentoPercentNum)}%)`
+      : "Descuento";
 
-    const totalSinPropinaLabel = showPropina
-      ? "TOTAL"
-      : "TOTAL";
+    const totalSinPropinaLabel = "TOTAL";
 
     const headerOperativoHtml = `
       <div class="small">
@@ -266,11 +283,14 @@ app.post("/print-factura", async (req, res) => {
 
     const footerFechaHtml = `
       <div class="line"></div>
-      <div class="center small">${normStr(fechaImpresion || new Date().toLocaleString("es-CL"))}</div>
+      <div class="center small">${normStr(
+        fechaImpresion || new Date().toLocaleString("es-CL")
+      )}</div>
     `;
 
-    // ===== NUEVO: mostrar/ocultar IVA según ivaPercent =====
-    const showIvaBlock = Number.isFinite(Number(ivaPercent)) && Number(ivaPercent) > 0;
+    // ===== IVA visible solo si > 0 =====
+    const showIvaBlock =
+      Number.isFinite(Number(ivaPercent)) && Number(ivaPercent) > 0;
 
     const ivaSectionHtml = showIvaBlock
       ? `
@@ -279,41 +299,27 @@ app.post("/print-factura", async (req, res) => {
           <span>${normStr(subtotal) || "$0.00"}</span>
         </div>
         <div class="flex-row small">
-          <span>IVA ${Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"}%</span>
+          <span>IVA ${
+            Number.isFinite(Number(ivaPercent)) ? Number(ivaPercent) : "19"
+          }%</span>
           <span>${normStr(ivaValor) || "$0.00"}</span>
         </div>
       `
       : "";
 
-    // Etiqueta final mínima: si no hay IVA, no lo mencionamos
-    const finalTotalLabel =
-      showPropina
-        ? (showIvaBlock ? "TOTAL (IVA + propina)" : "TOTAL (propina)")
-        : (showIvaBlock ? "TOTAL (IVA)" : "TOTAL");
+    const finalTotalLabel = showPropina
+      ? showIvaBlock
+        ? "TOTAL (IVA + propina)"
+        : "TOTAL (propina)"
+      : showIvaBlock
+      ? "TOTAL (IVA)"
+      : "TOTAL";
 
-    const fullHtml = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-        <title>Factura</title>
-        <style>
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .small { font-size: 10px; }
-          .line { border-bottom: 1px dashed #999; margin: 10px 0; }
-          .flex-row { display: flex; justify-content: space-between; margin: 2px 0; }
-          .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; }
-          .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }
-          body { margin: 0; padding: 10px; font-family: 'Courier New', monospace; }
-        </style>
-    </head>
-    <body>
+    // === HTML de UNA PÁGINA (una copia) ===
+    const onePageInner = () => `
       <div class="center bold">${normStr(nombreNegocio) || ""}</div>
       <div class="center small">${normStr(direccion) || ""}<br/></div>
 
-      <!-- línea separadora pedida, igual que en comanda -->
       <div class="line"></div>
 
       ${headerOperativoHtml}
@@ -343,7 +349,9 @@ app.post("/print-factura", async (req, res) => {
         <div class="flex-row small">
           <span>${normStr(descuentoLabel)}</span>
           <span>-${normStr(descuentoValor)}</span>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
 
         ${
           showPropina
@@ -359,14 +367,74 @@ app.post("/print-factura", async (req, res) => {
             <span>${normStr(finalTotalLabel)}</span>
             <span>${normStr(totaltotal)}</span>
           </div>
-        ` : ""}
+        `
+            : ""
+        }
       </div>
 
       <div class="line"></div>
 
-      <div class="center small">Forma Pago: ${normStr(formaPago) || "Efectivo"}</div>
+      <div class="center small">Forma Pago: ${
+        normStr(formaPago) || "Efectivo"
+      }</div>
 
       ${footerFechaHtml}
+    `;
+
+    // === Un SOLO documento con N páginas (una por copia) ===
+    const pagesHtml = Array.from(
+      { length: copiesUsed },
+      () => `<section class="page">${onePageInner()}</section>`
+    ).join("");
+
+    const fullHtml = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+        <title>Factura</title>
+        <style>
+          @page { margin: 0; } /* asegura 0 en TODAS las páginas */
+
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .small { font-size: 10px; }
+          .line { border-bottom: 1px dashed #999; margin: 10px 0; }
+          .flex-row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .total-section { margin-top: 15px; padding-top: 10px; border-top: 1px solid #999; }
+          .final-total { font-size: 14px; font-weight: bold; border-top: 2px solid #333; padding-top: 5px; margin-top: 5px; }
+
+          /* Estilos para productos - permitir salto de línea */
+          .producto-nombre { 
+            flex: 1; 
+            word-wrap: break-word; 
+            word-break: break-word; 
+            overflow-wrap: break-word;
+            padding-right: 5px;
+            max-width: calc(100% - 60px); /* Reserva espacio para el precio */
+          }
+          .producto-precio { 
+            flex-shrink: 0; 
+            text-align: right; 
+            white-space: nowrap;
+            min-width: 50px;
+          }
+
+          /* 🔧 Importante: sin padding en body; el padding por página va en .page */
+          body { margin: 0; padding: 0; font-family: 'Courier New', monospace; }
+
+          /* Multi-página: cada sección es una copia con su propio padding */
+          .page { 
+            box-sizing: border-box;
+            padding: 10px;              /* 👈 padding uniforme en CADA página */
+            page-break-after: always; 
+          }
+          .page:last-child { page-break-after: auto; }
+        </style>
+    </head>
+    <body>
+      ${pagesHtml}
     </body>
     </html>
     `;
@@ -378,20 +446,31 @@ app.post("/print-factura", async (req, res) => {
       printBackground: true,
       width: "3.15in",
       height: "11.69in",
-      margin: { top: 0, bottom: 0, left: 0, right: 0 },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 }, // márgenes 0; padding se maneja en .page
     });
 
     await browser.close();
 
-    await printer.print(pdfPath, printerName ? { printer: printerName } : {});
+    // Imprimir con un SOLO job, sin pasar 'copies' al driver
+    const options = printerName ? { printer: printerName } : {};
+    await printer.print(pdfPath, options);
     fs.unlinkSync(pdfPath);
 
-    res.json({ success: true, message: "Factura enviada a imprimir correctamente" });
+    res.json({
+      success: true,
+      message: "Factura enviada a imprimir correctamente",
+      copiesUsed,
+      multipage: true,
+    });
   } catch (err) {
     console.error("Error al imprimir factura:", err);
+    try { if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath); } catch {}
     res.status(500).json({ error: "Error al imprimir factura", details: err.message });
   }
 });
+
+
+
 
 // POST /print -> PDF
 app.post("/print", async (req, res) => {
