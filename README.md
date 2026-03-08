@@ -67,7 +67,7 @@ pm2 save
 
 ```Bash
 
-curl -X POST https://foregoing-wilburn-healthily.ngrok-free.dev/print-comanda \
+curl -X POST https://impresora.local/print-comanda \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "numeroComanda": "4908",
@@ -95,11 +95,11 @@ curl -X POST https://foregoing-wilburn-healthily.ngrok-free.dev/print-comanda \
   ],
   "numeroImpresion": "1",
   "fechaImpresion": "2021-12-10 11:15:11",
-  "printerName": "EPSON TM-T20III Receipt"
+  "printerName": "EPSON_Comandas"
 }'
 
 
-curl -X POST http://foregoing-wilburn-healthily.ngrok-free.dev/print-factura \
+curl -X POST http://localhost:3000/print-factura \
 -H "Content-Type: application/json; charset=utf-8" \
 -d '{
   "nombreNegocio": "BRAVA",
@@ -145,7 +145,7 @@ curl -X POST http://foregoing-wilburn-healthily.ngrok-free.dev/print-factura \
   "propina": "$15.99",
   "totaltotal": "$130.99",
   "formaPago": "Credit",
-  "printerName": "EPSON TM-T20III Receipt"
+  "printerName": "EPSON_Comandas"
 }'
 ```
 

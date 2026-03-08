@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const puppeteer = require("puppeteer");
 const printer = require("pdf-to-printer");
 const fs = require("fs");
+const https = require("https");
 const cors = require("cors");
 
 const app = express();
@@ -36,7 +37,7 @@ app.get("/printers", async (req, res) => {
 app.post("/print-comanda", async (req, res) => {
   console.log(req.body)
   const {
-    printerName = 'EPSON TM-T20III Receipt',
+    printerName = 'EPSON_Comandas',
     numeroComanda,
     cuenta,
     mesa,
@@ -187,7 +188,7 @@ app.post("/print-comanda", async (req, res) => {
 
 app.post("/print-factura", async (req, res) => {
   const {
-    printerName = 'EPSON TM-T20III Receipt',
+    printerName = 'EPSON_Comandas',
     nombreNegocio,
     direccion,
     productos,
@@ -560,11 +561,16 @@ app.post("/print/raw", async (req, res) => {
 });
 
 // Servidor
-const PORT  = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
-  console.log(`📄 API Comanda: http://localhost:${PORT}/print-comanda`);
-  console.log(`🧾 API Factura: http://localhost:${PORT}/print-factura`);
-  console.log(`🖨️  API Impresoras: http://localhost:${PORT}/printers`);
+const PORT = process.env.PORT || 443;
+const options = {
+  cert: fs.readFileSync(process.env.SSL_CERT),
+  key:  fs.readFileSync(process.env.SSL_KEY)
+};
+
+https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor ejecutándose en https://localhost:${PORT}`);
+  console.log(`📄 API Comanda: https://localhost:${PORT}/print-comanda`);
+  console.log(`🧾 API Factura: https://localhost:${PORT}/print-factura`);
+  console.log(`🖨️  API Impresoras: https://localhost:${PORT}/printers`);
   console.log(`✅ CORS habilitado para desarrollo`);
 });
