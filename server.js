@@ -46,7 +46,11 @@ app.post("/print-comanda", async (req, res) => {
     numeroImpresion,
     fechaImpresion,
     comentarios, // <-- NUEVO: array opcional de strings
+    tipoSucursalEsVenta = false,
   } = req.body;
+
+  const mesaLabel = tipoSucursalEsVenta ? "Venta" : "Mesa";
+  const meseroLabel = tipoSucursalEsVenta ? "Vendedor" : "Mesero";
 
   // Validar datos requeridos
   if (!numeroComanda) return res.status(400).json({ error: "Falta parámetro 'numeroComanda'" });
@@ -138,8 +142,8 @@ app.post("/print-comanda", async (req, res) => {
         <div class="line"></div>
         <div class="small">
             <div>Cuenta: ${normStr(cuenta)}</div>
-            <div>Mesa: ${normStr(mesa)}</div>
-            <div>Mesero: ${normStr(mesero)}</div>
+            <div>${mesaLabel}: ${normStr(mesa)}</div>
+            <div>${meseroLabel}: ${normStr(mesero)}</div>
         </div>
         <div class="line"></div>
         <table width="100%" class="small">
@@ -203,7 +207,10 @@ app.post("/print-factura", async (req, res) => {
     numeroCuenta,
     // 🆕 opcional
     copies,
+    tipoSucursalEsVenta = false,
   } = req.body;
+
+  const operarioLabel = tipoSucursalEsVenta ? "Vendedor" : "Mesero";
 
   if (!productos || !Array.isArray(productos)) {
     return res.status(400).json({ error: "Falta parámetro 'productos' como array" });
@@ -276,7 +283,7 @@ app.post("/print-factura", async (req, res) => {
 
     const headerOperativoHtml = `
       <div class="small">
-        <div>Mesero: ${normStr(empleadoNombre)}</div>
+        <div>${operarioLabel}: ${normStr(empleadoNombre)}</div>
         <div>Numero de orden: ${normStr(numeroCuenta)}</div>
       </div>
     `;
